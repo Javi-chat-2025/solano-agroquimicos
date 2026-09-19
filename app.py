@@ -1047,7 +1047,7 @@ with tab_registro:
                                     }).execute()
                                     st.success(f"Huerta '{nuevo_nombre_h}' registrada con éxito.")
                                     st.rerun()
-                                except Exception as e:
+                                mexc:
                                     st.error(f"Error al guardar huerta: {e}")
                             else:
                                 st.error("Campos obligatorios (*).")

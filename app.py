@@ -97,11 +97,7 @@ if "session" in st.query_params:
     st.query_params.clear()
 
 # 2. Inicializar gestor de cookies de forma eficiente
-@st.cache_resource
-def get_cookie_manager():
-    return stx.CookieManager()
-
-cookie_manager = get_cookie_manager()
+cookie_manager = stx.CookieManager()
 
 # 3. Inicializar variables en memoria
 if "autenticado" not in st.session_state:

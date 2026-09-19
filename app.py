@@ -89,26 +89,25 @@ def obtener_siguiente_num_factura():
         return "0000001"
 
 # ==========================================
-# CONTROL DE SESIÓN Y AUTENTICACIÓN (CON COOKIES)
+# CONTROL DE SESIÓN Y AUTENTICACIÓN (PERSISTENTE)
 # ==========================================
-cookie_manager = stx.CookieManager()
-
-# Variables de sesión iniciales
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
 
-# Recuperar cookie si no estamos autenticados en memoria
-if not st.session_state.autenticado:
-    solano_cookie = cookie_manager.get("solano_user")
-    if solano_cookie:
-        try:
-            user_data = json.loads(solano_cookie) if isinstance(solano_cookie, str) else solano_cookie
+# Intentar auto-login si existe token en la URL (al dar F5)
+if not st.session_state.autenticado and "session" in st.query_params:
+    token_usuario = st.query_params["session"]
+    try:
+        res = supabase.table("usuarios").select("*").eq("id_usuario", token_usuario).execute()
+        if res.data and len(res.data) > 0:
             st.session_state.autenticado = True
-            st.session_state.usuario = user_data
-        except Exception:
-            pass
+            st.session_state.usuario = res.data[0]
+        else:
+            st.query_params.clear()
+    except Exception:
+        st.query_params.clear()
 
 def pantalla_login():
     col1, col2, col3 = st.columns([1, 1.2, 1])
@@ -134,23 +133,11 @@ def pantalla_login():
                             res = supabase.table("usuarios").select("*").eq("correo", correo_input).eq("contrasena", pass_input).execute()
                             if res.data and len(res.data) > 0:
                                 user_data = res.data[0]
-                                
-                                # Convertir a datos limpios
-                                user_clean = {
-                                    "id_usuario": str(user_data.get("id_usuario", "")),
-                                    "nombre": str(user_data.get("nombre", "")),
-                                    "correo": str(user_data.get("correo", ""))
-                                }
-                                
                                 st.session_state.autenticado = True
-                                st.session_state.usuario = user_clean
+                                st.session_state.usuario = user_data
                                 
-                                # Guardar cookie en el navegador
-                                cookie_manager.set(
-                                    cookie="solano_user", 
-                                    val=json.dumps(user_clean), 
-                                    key="set_solano_user"
-                                )
+                                # Guardar parámetro en la URL para sobrevivir al F5
+                                st.query_params["session"] = str(user_data.get("id_usuario"))
                                 st.success("¡Acceso concedido!")
                                 st.rerun()
                             else:

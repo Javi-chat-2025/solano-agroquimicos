@@ -3,3 +3,4 @@ supabase
 fpdf2
 pandas
 python-dotenv
+extra-streamlit-components

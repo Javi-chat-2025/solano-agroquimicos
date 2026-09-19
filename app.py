@@ -380,7 +380,7 @@ def generar_pdf_estilo_solano(
     pdf.set_auto_page_break(auto=True, margin=32)
     
     def dividir_texto_en_lineas(texto, max_w):
-        txt = str(texto or "").strip()
+        txt = str(texto or "").replace("—", "-").strip()
         if not txt:
             return [""]
         txt = txt.replace("/", " / ").replace("-", "- ")

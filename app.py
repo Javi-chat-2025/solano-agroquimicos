@@ -89,25 +89,26 @@ def obtener_siguiente_num_factura():
         return "0000001"
 
 # ==========================================
-# CONTROL DE SESIÓN Y AUTENTICACIÓN (PERSISTENTE)
+# CONTROL DE SESIÓN Y AUTENTICACIÓN (PERSISTENTE POR URL)
 # ==========================================
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
 
-# Intentar auto-login si existe token en la URL (al dar F5)
+# Intentar auto-login al cargar si existe la variable 'session' en la URL (al presionar F5)
 if not st.session_state.autenticado and "session" in st.query_params:
-    token_usuario = st.query_params["session"]
-    try:
-        res = supabase.table("usuarios").select("*").eq("id_usuario", token_usuario).execute()
-        if res.data and len(res.data) > 0:
-            st.session_state.autenticado = True
-            st.session_state.usuario = res.data[0]
-        else:
+    correo_guardado = st.query_params.get("session")
+    if correo_guardado:
+        try:
+            res = supabase.table("usuarios").select("*").eq("correo", correo_guardado).execute()
+            if res.data and len(res.data) > 0:
+                st.session_state.autenticado = True
+                st.session_state.usuario = res.data[0]
+            else:
+                st.query_params.clear()
+        except Exception:
             st.query_params.clear()
-    except Exception:
-        st.query_params.clear()
 
 def pantalla_login():
     col1, col2, col3 = st.columns([1, 1.2, 1])
@@ -136,8 +137,8 @@ def pantalla_login():
                                 st.session_state.autenticado = True
                                 st.session_state.usuario = user_data
                                 
-                                # Guardar parámetro en la URL para sobrevivir al F5
-                                st.query_params["session"] = str(user_data.get("id_usuario"))
+                                # Guardar el correo en la URL del navegador
+                                st.query_params["session"] = str(user_data.get("correo"))
                                 st.success("¡Acceso concedido!")
                                 st.rerun()
                             else:

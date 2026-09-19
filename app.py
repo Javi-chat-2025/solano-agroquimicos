@@ -579,7 +579,7 @@ def generar_pdf_estilo_solano(
     pdf.set_xy(35, y_sello + 3)
     pdf.set_font("Helvetica", "B", 7.5)
     pdf.set_text_color(27, 67, 50)
-    pdf.cell(0, 3.5, "VERIFICACIÓN Y AUTENTICIDAD DIGITAL — SOLANO AGROQUÍMICOS", ln=True)
+    pdf.cell(0, 3.5, "VERIFICACIÓN Y AUTENTICIDAD DIGITAL - SOLANO AGROQUÍMICOS", ln=True)
     
     pdf.set_xy(35, y_sello + 7.5)
     pdf.set_font("Helvetica", "", 7)

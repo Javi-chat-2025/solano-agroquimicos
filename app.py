@@ -89,34 +89,27 @@ def obtener_siguiente_num_factura():
         return "0000001"
 
 # ==========================================
-# CONTROL DE SESIÓN Y AUTENTICACIÓN (SEGURO VÍA COOKIES)
+# CONTROL DE SESIÓN Y AUTENTICACIÓN (COOKIES PERSISTENTES)
 # ==========================================
+# 1. Asignar un identificador único al gestor de cookies
+cookie_manager = stx.CookieManager(key="solano_cookie_manager")
 
-# 1. Limpiar inmediatamente cualquier parámetro de sesión expuesto previamente en la URL
-if "session" in st.query_params:
-    st.query_params.clear()
-
-# 2. Inicializar gestor de cookies de forma eficiente
-cookie_manager = stx.CookieManager()
-
-# 3. Inicializar variables en memoria
+# 2. Inicializar el estado de la sesión
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
 
-# 4. Intentar recuperar sesión desde la cookie local al presionar F5
-if not st.session_state.autenticado:
-    cookies_actuales = cookie_manager.get_all()  # Sincronización inicial
-    solano_cookie = cookie_manager.get("solano_session")
-    
-    if solano_cookie:
-        try:
-            user_data = json.loads(solano_cookie) if isinstance(solano_cookie, str) else solano_cookie
-            st.session_state.autenticado = True
-            st.session_state.usuario = user_data
-        except Exception:
-            pass
+# 3. Leer la cookie guardada si se recarga la página (F5)
+solano_cookie = cookie_manager.get(cookie="solano_session")
+
+if solano_cookie and not st.session_state.autenticado:
+    try:
+        user_data = json.loads(solano_cookie) if isinstance(solano_cookie, str) else solano_cookie
+        st.session_state.autenticado = True
+        st.session_state.usuario = user_data
+    except Exception:
+        pass
 
 def pantalla_login():
     col1, col2, col3 = st.columns([1, 1.2, 1])
@@ -142,8 +135,6 @@ def pantalla_login():
                             res = supabase.table("usuarios").select("*").eq("correo", correo_input).eq("contrasena", pass_input).execute()
                             if res.data and len(res.data) > 0:
                                 user_data = res.data[0]
-                                
-                                # Datos de usuario serializables
                                 user_clean = {
                                     "id_usuario": str(user_data.get("id_usuario", "")),
                                     "nombre": str(user_data.get("nombre", "")),
@@ -153,14 +144,16 @@ def pantalla_login():
                                 st.session_state.autenticado = True
                                 st.session_state.usuario = user_clean
                                 
-                                # Guardar cookie en el navegador local (oculta en la URL)
+                                # Guardar cookie con 7 días de vigencia
+                                fecha_expiracion = datetime.now() + timedelta(days=7)
                                 cookie_manager.set(
                                     cookie="solano_session", 
                                     val=json.dumps(user_clean), 
+                                    expires_at=fecha_expiracion,
                                     key="set_solano_session"
                                 )
                                 st.success("¡Acceso concedido!")
-                                st.rerun()
+                                # NOTA: No ejecutamos st.rerun() aquí para permitir que el navegador grabe la cookie
                             else:
                                 st.error("Credenciales incorrectas. Verifica tus datos.")
                         except Exception as e:

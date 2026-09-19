@@ -251,10 +251,10 @@ with col_titulo_web:
 with col_user:
     st.write(f"👤 **{st.session_state.usuario.get('nombre', 'Usuario')}**")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
-    cookie_manager.delete("solano_user", key="delete_solano_user")
-    st.session_state.autenticado = False
-    st.session_state.usuario = None
-    st.rerun()
+        cookie_manager.delete("solano_user", key="delete_solano_user")
+        st.session_state.autenticado = False
+        st.session_state.usuario = None
+        st.rerun()
 
 st.divider()
 

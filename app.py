@@ -89,26 +89,38 @@ def obtener_siguiente_num_factura():
         return "0000001"
 
 # ==========================================
-# CONTROL DE SESIÓN Y AUTENTICACIÓN (PERSISTENTE POR URL)
+# CONTROL DE SESIÓN Y AUTENTICACIÓN (SEGURO VÍA COOKIES)
 # ==========================================
+
+# 1. Limpiar inmediatamente cualquier parámetro de sesión expuesto previamente en la URL
+if "session" in st.query_params:
+    st.query_params.clear()
+
+# 2. Inicializar gestor de cookies de forma eficiente
+@st.cache_resource
+def get_cookie_manager():
+    return stx.CookieManager()
+
+cookie_manager = get_cookie_manager()
+
+# 3. Inicializar variables en memoria
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
 
-# Intentar auto-login al cargar si existe la variable 'session' en la URL (al presionar F5)
-if not st.session_state.autenticado and "session" in st.query_params:
-    correo_guardado = st.query_params.get("session")
-    if correo_guardado:
+# 4. Intentar recuperar sesión desde la cookie local al presionar F5
+if not st.session_state.autenticado:
+    cookies_actuales = cookie_manager.get_all()  # Sincronización inicial
+    solano_cookie = cookie_manager.get("solano_session")
+    
+    if solano_cookie:
         try:
-            res = supabase.table("usuarios").select("*").eq("correo", correo_guardado).execute()
-            if res.data and len(res.data) > 0:
-                st.session_state.autenticado = True
-                st.session_state.usuario = res.data[0]
-            else:
-                st.query_params.clear()
+            user_data = json.loads(solano_cookie) if isinstance(solano_cookie, str) else solano_cookie
+            st.session_state.autenticado = True
+            st.session_state.usuario = user_data
         except Exception:
-            st.query_params.clear()
+            pass
 
 def pantalla_login():
     col1, col2, col3 = st.columns([1, 1.2, 1])
@@ -134,11 +146,23 @@ def pantalla_login():
                             res = supabase.table("usuarios").select("*").eq("correo", correo_input).eq("contrasena", pass_input).execute()
                             if res.data and len(res.data) > 0:
                                 user_data = res.data[0]
-                                st.session_state.autenticado = True
-                                st.session_state.usuario = user_data
                                 
-                                # Guardar el correo en la URL del navegador
-                                st.query_params["session"] = str(user_data.get("correo"))
+                                # Datos de usuario serializables
+                                user_clean = {
+                                    "id_usuario": str(user_data.get("id_usuario", "")),
+                                    "nombre": str(user_data.get("nombre", "")),
+                                    "correo": str(user_data.get("correo", ""))
+                                }
+                                
+                                st.session_state.autenticado = True
+                                st.session_state.usuario = user_clean
+                                
+                                # Guardar cookie en el navegador local (oculta en la URL)
+                                cookie_manager.set(
+                                    cookie="solano_session", 
+                                    val=json.dumps(user_clean), 
+                                    key="set_solano_session"
+                                )
                                 st.success("¡Acceso concedido!")
                                 st.rerun()
                             else:
@@ -239,7 +263,7 @@ with col_titulo_web:
 with col_user:
     st.write(f"👤 **{st.session_state.usuario.get('nombre', 'Usuario')}**")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
-        st.query_params.clear()
+        cookie_manager.delete("solano_session", key="delete_solano_session")
         st.session_state.autenticado = False
         st.session_state.usuario = None
         st.rerun()

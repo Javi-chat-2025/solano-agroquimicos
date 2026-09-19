@@ -138,15 +138,19 @@ if "validar" in st.query_params:
     st.markdown("<h4 style='text-align: center;'>Verificación de Autenticidad de Receta</h4>", unsafe_allow_html=True)
     st.write("---")
     
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([0.5, 3, 0.5])
     with col2:
         try:
-            res = supabase.table("recetas").select("*, huertas(nombre_huerta, clientes(nombre))").eq("sello_digital", codigo_qr).execute()
+            res = supabase.table("recetas").select(
+                "*, huertas(nombre_huerta, clientes(nombre)), "
+                "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, concentracion, formulacion, uso))"
+            ).eq("sello_digital", codigo_qr).execute()
             
             if res.data and len(res.data) > 0:
                 receta = res.data[0]
                 huerta_info = receta.get("huertas") or {}
                 cliente_info = huerta_info.get("clientes") or {}
+                detalles = receta.get("receta_detalles", [])
                 
                 st.success("✅ **DOCUMENTO AUTÉNTICO Y REGISTRADO**")
                 
@@ -156,12 +160,30 @@ if "validar" in st.query_params:
                     st.markdown(f"**Cliente:** {cliente_info.get('nombre', 'Cliente General')}")
                     st.markdown(f"**Huerta:** {huerta_info.get('nombre_huerta', 'N/A')}")
                     st.markdown(f"**Objetivo:** {receta.get('objetivo', 'N/A')}")
+                    st.markdown(f"**Volumen del Tanque:** {receta.get('volumen_tanque', 'N/A')}")
                     st.markdown(f"**Sello Digital:** `{codigo_qr}`")
                     
-                st.caption("Este documento ha sido autenticado por el sistema central de Solano Agroquímicos.")
+                    st.markdown("---")
+                    st.markdown("### 🧪 Productos Recetados")
+                    
+                    if detalles:
+                        prods_tabla = []
+                        for d in detalles:
+                            p = d.get("productos") or {}
+                            prods_tabla.append({
+                                "Código": p.get("id_producto", "-"),
+                                "Producto Comercial": p.get("nombre_comercial", "-"),
+                                "Ingrediente Activo": p.get("nombre_tecnico", "-"),
+                                "Dosis Recomendada": f"{d.get('dosis', '')} {d.get('unidad', '')}".strip()
+                            })
+                        st.dataframe(pd.DataFrame(prods_tabla), use_container_width=True, hide_index=True)
+                    else:
+                        st.info("Esta receta no incluye productos detallados en el registro.")
+                    
+                st.caption("Este documento ha sido autenticado en tiempo real por el sistema central de Solano Agroquímicos.")
             else:
                 st.error("❌ **DOCUMENTO NO ENCONTRADO O INVÁLIDO**")
-                st.warning("El código escaneado no coincide con ninguna receta registrada.")
+                st.warning("El código escaneado no coincide con ninguna receta registrada en nuestro sistema central.")
                 
         except Exception as e:
             st.error(f"Error al verificar la receta: {e}")

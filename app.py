@@ -107,7 +107,7 @@ def pantalla_login():
             st.caption("Solano Agroquímicos — Sistema de Gestión")
             
             with st.form("form_login"):
-                correo_input = st.text_input("Correo Electrónico", placeholder="admin@solano.com")
+                correo_input = st.text_input("Correo Electrónico", placeholder="Introduce el correo")
                 pass_input = st.text_input("Contraseña", type="password", placeholder="••••••••")
                 btn_ingresar = st.form_submit_button("Ingresar al Sistema", type="primary", use_container_width=True)
                 

@@ -1,0 +1,174 @@
+/* ==========================================
+   ESTILOS GENERALES - AGROTECH CATALOG
+   ========================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1e293b;
+}
+
+/* Ocultar elementos predeterminados de Streamlit */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+header { visibility: hidden; }
+
+/* Contenedor principal de la app */
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 3rem;
+    max-width: 95%;
+}
+
+/* ------------------------------------------
+   TÍTULOS Y ENCABEZADOS
+   ------------------------------------------ */
+h1, h2, h3, h4 {
+    color: #0f172a;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* ------------------------------------------
+   CAMPOS DE ENTRADA (Inputs, Selects)
+   ------------------------------------------ */
+.stTextInput > div > div > input,
+.stSelectbox > div > div > div,
+.stNumberInput > div > div > input,
+.stTextArea textarea {
+    border-radius: 8px !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 14px !important;
+    color: #334155 !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s ease-in-out;
+}
+
+.stTextInput > div > div > input:focus,
+.stSelectbox > div > div > div:focus,
+.stTextArea textarea:focus {
+    border-color: #37f8f1 !important;
+    box-shadow: 0 0 0 3px rgba(240, 249, 83, 0.403) !important;
+}
+
+/* ------------------------------------------
+   BOTONES PROFESIONALES Y DE ACCIÓN
+   ------------------------------------------ */
+/* Estilo base para todos los botones */
+div.stButton > button {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    padding: 6px 8px !important; /* Padding ajustado para no ocultar iconos en columnas estrechas */
+    border: 1px solid #cbd5e1 !important;
+    background-color: #ffffff !important;
+    color: #334155 !important;
+    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05) !important;
+    transition: all 0.2s ease-in-out !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-height: 38px !important;
+    line-height: 1 !important;
+}
+
+div.stButton > button:hover {
+    background-color: #f8fafc !important;
+    border-color: #94a3b8 !important;
+    color: #0f172a !important;
+    transform: translateY(-1px);
+}
+
+div.stButton > button:active {
+    transform: translateY(0);
+}
+
+/* Botones Principales (Verde Agrotech) */
+div.stButton > button[kind="primary"] {
+    background-color: #eea667 !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0px 3px 8px rgba(30, 58, 41, 0.25) !important;
+    padding: 8px 16px !important;
+}
+
+div.stButton > button[kind="primary"]:hover {
+    background-color: #2d5a3f !important;
+    box-shadow: 0px 5px 12px rgba(30, 58, 41, 0.35) !important;
+}
+
+/* Botones Secundarios */
+div.stButton > button[kind="secondary"] {
+    background-color: #f1f5f9 !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #475569 !important;
+}
+
+div.stButton > button[kind="secondary"]:hover {
+    background-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+/* ------------------------------------------
+   TABLAS Y FILAS (Alineación con st.columns)
+   ------------------------------------------ */
+div[data-testid="column"] {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Encabezados de tabla personalizados */
+.table-header {
+    font-weight: 700;
+    color: #0f172a;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 12px;
+}
+
+/* Línea divisora sutil entre registros */
+hr {
+    margin: 0.75rem 0 !important;
+    border: none !important;
+    border-top: 1px solid #f1f5f9 !important;
+}
+
+/* ------------------------------------------
+   PESTAÑAS (ST.TABS)
+   ------------------------------------------ */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 42px;
+    border-radius: 8px 8px 0px 0px;
+    padding: 8px 16px;
+    font-weight: 600;
+    color: #64748b;
+    background-color: transparent;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #1e3a29 !important;
+    color: #ffffff !important;
+}
+
+/* ------------------------------------------
+   ALERTAS Y TARJETAS
+   ------------------------------------------ */
+.stAlert {
+    border-radius: 8px !important;
+}
+
+div[data-testid="stExpander"] {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}

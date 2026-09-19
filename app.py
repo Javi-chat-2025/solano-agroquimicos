@@ -1,15 +1,19 @@
 import os
 import io
 import json
+import hashlib
 from datetime import datetime, timedelta
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
 from supabase import create_client
 from fpdf import FPDF
-import extra_streamlit_components as stx  # 👈 1. LIBRERÍA DE COOKIES AGREGADA
+import extra_streamlit_components as stx
+import qrcode
 
-# Cargar variables de entorno desde .env
+# ==========================================
+# CONFIGURACIÓN INICIAL DE LA APLICACIÓN
+# ==========================================
 load_dotenv()
 
 st.set_page_config(
@@ -17,6 +21,9 @@ st.set_page_config(
     page_icon="🥑", 
     layout="wide"
 )
+
+# Cambia esta URL por el enlace público de tu app desplegada
+URL_BASE_APP = "https://solano-agroquimicos.streamlit.app"
 
 # ==========================================
 # CARGAR ESTILOS EXTERNOS (style.css)
@@ -28,12 +35,13 @@ def cargar_css(nombre_archivo="style.css"):
 
 cargar_css("style.css")
 
-# Función auxiliar para obtener la fecha del día en formato DD/MM/YYYY
+# ==========================================
+# FUNCIONES AUXILIARES GENERALES
+# ==========================================
 def obtener_fecha_actual():
     ahora = datetime.now()
     return ahora.strftime("%d/%m/%Y")
 
-# Función auxiliar para formatear de forma limpia el ID de Cliente
 def formatear_id_cliente(id_raw):
     if id_raw is None:
         return "N/A"
@@ -41,14 +49,11 @@ def formatear_id_cliente(id_raw):
         return f"CLI-{int(id_raw):04d}"
     return str(id_raw)
 
-# Función para generar archivo .ics para el Calendario del iPhone / Android
 def generar_evento_ics(titulo, descripcion, ubicacion, fecha_inicio_dt, duracion_horas=1):
     fecha_fin_dt = fecha_inicio_dt + timedelta(hours=duracion_horas)
-    
     fmt = "%Y%m%dT%H%M%S"
     inicio_str = fecha_inicio_dt.strftime(fmt)
     fin_str = fecha_fin_dt.strftime(fmt)
-    
     desc_clean = str(descripcion or "").replace("\n", " - ")
     
     ics_content = f"""BEGIN:VCALENDAR
@@ -65,7 +70,6 @@ DTEND:{fin_str}
 STATUS:CONFIRMED
 END:VEVENT
 END:VCALENDAR"""
-    
     return ics_content.encode("utf-8")
 
 @st.cache_resource
@@ -89,18 +93,99 @@ def obtener_siguiente_num_factura():
         return "0000001"
 
 # ==========================================
-# CONTROL DE SESIÓN Y AUTENTICACIÓN (COOKIES PERSISTENTES)
+# GENERACIÓN DE SELLO DIGITAL Y QR
 # ==========================================
-# 1. Asignar un identificador único al gestor de cookies
+def generar_sello_y_qr(num_factura, correo_usuario):
+    """Genera huella criptográfica SHA-256 e imagen QR en memoria."""
+    fecha_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    cadena_original = f"SOLANO|{num_factura}|{correo_usuario}|{fecha_hora}"
+    
+    hash_obj = hashlib.sha256(cadena_original.encode('utf-8')).hexdigest()
+    sello_corto = hash_obj[:16].upper()
+    sello_formateado = "-".join([sello_corto[i:i+4] for i in range(0, 16, 4)])
+    
+    url_validacion = f"{URL_BASE_APP}/?validar={sello_formateado}"
+    
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=6,
+        border=1,
+    )
+    qr.add_data(url_validacion)
+    qr.make(fit=True)
+    
+    img_qr = qr.make_image(fill_color="#1b4332", back_color="white")
+    
+    qr_bytes = io.BytesIO()
+    img_qr.save(qr_bytes, format='PNG')
+    qr_bytes.seek(0)
+    
+    return {
+        "sello": sello_formateado,
+        "fecha_hora": fecha_hora,
+        "qr_bytes": qr_bytes,
+        "url": url_validacion
+    }
+
+# ==========================================
+# VERIFICACIÓN PÚBLICA DE QR (SIN NECESIDAD DE LOGIN)
+# ==========================================
+if "validar" in st.query_params:
+    codigo_qr = st.query_params["validar"]
+    
+    st.markdown("<h2 style='text-align: center; color: #1b4332;'>🥑 Solano Agroquímicos</h2>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'>Verificación de Autenticidad de Receta</h4>", unsafe_allow_html=True)
+    st.write("---")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        try:
+            res = supabase.table("recetas").select("*, huertas(nombre_huerta, clientes(nombre))").eq("sello_digital", codigo_qr).execute()
+            
+            if res.data and len(res.data) > 0:
+                receta = res.data[0]
+                huerta_info = receta.get("huertas") or {}
+                cliente_info = huerta_info.get("clientes") or {}
+                
+                st.success("✅ **DOCUMENTO AUTÉNTICO Y REGISTRADO**")
+                
+                with st.container(border=True):
+                    st.markdown(f"**N.° Factura / Folio:** #{receta.get('num_factura', 'N/A')}")
+                    st.markdown(f"**Fecha de Emisión:** {receta.get('fecha', 'N/A')}")
+                    st.markdown(f"**Cliente:** {cliente_info.get('nombre', 'Cliente General')}")
+                    st.markdown(f"**Huerta:** {huerta_info.get('nombre_huerta', 'N/A')}")
+                    st.markdown(f"**Objetivo:** {receta.get('objetivo', 'N/A')}")
+                    st.markdown(f"**Sello Digital:** `{codigo_qr}`")
+                    
+                st.caption("Este documento ha sido autenticado por el sistema central de Solano Agroquímicos.")
+            else:
+                st.error("❌ **DOCUMENTO NO ENCONTRADO O INVÁLIDO**")
+                st.warning("El código escaneado no coincide con ninguna receta registrada.")
+                
+        except Exception as e:
+            st.error(f"Error al verificar la receta: {e}")
+            
+        st.write("")
+        if st.button("⬅️ Ir al Inicio de Sesión", use_container_width=True):
+            st.query_params.clear()
+            st.rerun()
+            
+    st.stop()
+
+# ==========================================
+# CONTROL DE SESIÓN Y PERSISTENCIA POR COOKIES
+# ==========================================
+if "session" in st.query_params:
+    st.query_params.clear()
+
 cookie_manager = stx.CookieManager(key="solano_cookie_manager")
 
-# 2. Inicializar el estado de la sesión
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
 
-# 3. Leer la cookie guardada si se recarga la página (F5)
 solano_cookie = cookie_manager.get(cookie="solano_session")
 
 if solano_cookie and not st.session_state.autenticado:
@@ -140,20 +225,18 @@ def pantalla_login():
                                     "nombre": str(user_data.get("nombre", "")),
                                     "correo": str(user_data.get("correo", ""))
                                 }
-                                
                                 st.session_state.autenticado = True
                                 st.session_state.usuario = user_clean
                                 
-                                # Guardar cookie con 7 días de vigencia
-                                fecha_expiracion = datetime.now() + timedelta(days=7)
+                                fecha_exp = datetime.now() + timedelta(days=7)
                                 cookie_manager.set(
                                     cookie="solano_session", 
                                     val=json.dumps(user_clean), 
-                                    expires_at=fecha_expiracion,
+                                    expires_at=fecha_exp,
                                     key="set_solano_session"
                                 )
                                 st.success("¡Acceso concedido!")
-                                # NOTA: No ejecutamos st.rerun() aquí para permitir que el navegador grabe la cookie
+                                st.rerun()
                             else:
                                 st.error("Credenciales incorrectas. Verifica tus datos.")
                         except Exception as e:
@@ -163,7 +246,7 @@ if not st.session_state.autenticado:
     pantalla_login()
     st.stop()
 
-# Variables de navegación y estado de sesión de la app
+# Estado de variables de navegación interna
 if "cliente_sel" not in st.session_state:
     st.session_state.cliente_sel = None
 if "huerta_sel" not in st.session_state:
@@ -269,7 +352,7 @@ tab_perfiles, tab_nueva_receta, tab_visitas, tab_registro, tab_productos = st.ta
 ])
 
 # ==========================================
-# GENERADOR DE PDF CON TABLA MULTILÍNEA DINÁMICA
+# GENERADOR DE PDF CON CÓDIGO QR Y SELLO DIGITAL
 # ==========================================
 def generar_pdf_estilo_solano(
     empresa="SOLANO AGROQUÍMICOS",
@@ -286,6 +369,7 @@ def generar_pdf_estilo_solano(
     asesor_nombre="Q.F.B. Jose Luis Infante Magaña",
     asesor_ced="Ced: 10649771",
     asesor_rfc="RFC: IAML9204182U2",
+    sello_digital=None,
     logo_path="logo.png"
 ):
     if not fecha:
@@ -293,7 +377,7 @@ def generar_pdf_estilo_solano(
         
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_auto_page_break(auto=True, margin=32)
     
     def dividir_texto_en_lineas(texto, max_w):
         txt = str(texto or "").strip()
@@ -413,7 +497,6 @@ def generar_pdf_estilo_solano(
     pdf.cell(w_func, 7, "Uso", fill=True, align="C")
     pdf.cell(w_cant, 7, f"Cant. / {volumen_tanque}", fill=True, align="C", ln=True)
     
-    # CONTENIDO MULTILÍNEA DE LA TABLA
     pdf.set_font("Helvetica", "", 7)
     pdf.set_draw_color(220, 220, 220)
     
@@ -442,7 +525,7 @@ def generar_pdf_estilo_solano(
         line_height = 3.8
         row_h = max(max_num_lines * line_height + 3, 7.0)
         
-        if pdf.get_y() + row_h > 270:
+        if pdf.get_y() + row_h > 240:
             pdf.add_page()
             
         y_pos = pdf.get_y()
@@ -468,15 +551,50 @@ def generar_pdf_estilo_solano(
             
         pdf.set_y(y_pos + row_h)
         
-    pdf.ln(10)
+    pdf.ln(6)
     
-    # DATOS Y FIRMA DEL ASESOR
-    pdf.set_font("Helvetica", "B", 8.5)
+    # DATOS DEL ASESOR
+    pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*C_DARK)
-    pdf.cell(0, 4.5, asesor_nombre, ln=True, align="C")
-    pdf.set_font("Helvetica", "", 7.5)
-    pdf.cell(0, 4, asesor_ced, ln=True, align="C")
-    pdf.cell(0, 4, asesor_rfc, ln=True, align="C")
+    pdf.cell(0, 4, asesor_nombre, ln=True, align="C")
+    pdf.set_font("Helvetica", "", 7)
+    pdf.cell(0, 3.5, asesor_ced, ln=True, align="C")
+    pdf.cell(0, 3.5, asesor_rfc, ln=True, align="C")
+    
+    # Generar sello digital y QR si no viene proporcionado
+    correo_usr = st.session_state.usuario.get("correo", "info@solano.com") if st.session_state.usuario else "info@solano.com"
+    datos_qr = generar_sello_y_qr(num_factura, correo_usr)
+    sello_texto = sello_digital if sello_digital else datos_qr["sello"]
+    
+    # ESTAMPADO DE VERIFICACIÓN AL PIE DE PÁGINA
+    pdf.set_y(-30)
+    y_sello = pdf.get_y()
+    
+    pdf.set_fill_color(248, 249, 250)
+    pdf.set_draw_color(200, 210, 220)
+    pdf.rect(10, y_sello, 190, 24, style='DF')
+    
+    pdf.image(datos_qr["qr_bytes"], x=12, y=y_sello + 2, w=20, h=20)
+    
+    pdf.set_xy(35, y_sello + 3)
+    pdf.set_font("Helvetica", "B", 7.5)
+    pdf.set_text_color(27, 67, 50)
+    pdf.cell(0, 3.5, "VERIFICACIÓN Y AUTENTICIDAD DIGITAL — SOLANO AGROQUÍMICOS", ln=True)
+    
+    pdf.set_xy(35, y_sello + 7.5)
+    pdf.set_font("Helvetica", "", 7)
+    pdf.set_text_color(60, 60, 60)
+    pdf.cell(0, 3.5, f"Emitido por: {st.session_state.usuario.get('nombre', 'Técnico')} | Fecha: {datos_qr['fecha_hora']}", ln=True)
+    
+    pdf.set_xy(35, y_sello + 12)
+    pdf.set_font("Courier", "B", 7.5)
+    pdf.set_text_color(20, 20, 20)
+    pdf.cell(0, 3.5, f"Código de Autenticidad: {sello_texto}", ln=True)
+    
+    pdf.set_xy(35, y_sello + 16.5)
+    pdf.set_font("Helvetica", "I", 6)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 3.5, "Escanee el código QR para validar este documento oficialmente en el sistema.", ln=True)
     
     return pdf.output()
 
@@ -570,7 +688,7 @@ with tab_perfiles:
         st.write("---")
         
         res_recetas = supabase.table("recetas").select(
-            "id_receta, fecha, num_factura, objetivo, volumen_tanque, "
+            "id_receta, fecha, num_factura, objetivo, volumen_tanque, sello_digital, "
             "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, concentracion, formulacion, uso))"
         ).eq("id_huerta", huerta["id_huerta"]).order("id_receta", desc=True).execute()
         
@@ -590,6 +708,8 @@ with tab_perfiles:
                         st.markdown(f"### 📄 Receta #{r['id_receta']} — Fecha: `{r.get('fecha', 'N/A')}`")
                         st.write(f"**N.° Factura:** `{r.get('num_factura', 'N/A')}` | **Volumen:** {r.get('volumen_tanque', 'N/A')}")
                         st.write(f"🎯 **Objetivo:** {r.get('objetivo', 'N/A')}")
+                        if r.get("sello_digital"):
+                            st.caption(f"🛡️ **Sello Digital:** `{r.get('sello_digital')}`")
                         
                         prod_resumen = []
                         for d in detalles:
@@ -626,6 +746,7 @@ with tab_perfiles:
                             objetivo=r.get("objetivo", ""),
                             volumen_tanque=r.get("volumen_tanque", ""),
                             productos_detalle=prods_pdf,
+                            sello_digital=r.get("sello_digital"),
                             logo_path="logo.png"
                         )
                         
@@ -749,12 +870,16 @@ with tab_nueva_receta:
             with col_b2:
                 if st.button("💾 Guardar Receta y Generar PDF", type="primary"):
                     try:
+                        # Generar sello digital único
+                        sello_info = generar_sello_y_qr(num_factura, st.session_state.usuario.get("correo"))
+                        
                         res_receta = supabase.table("recetas").insert({
                             "id_huerta": huerta_info["id_huerta"],
                             "fecha": fecha_receta,
                             "num_factura": num_factura,
                             "objetivo": objetivo_aplicacion,
-                            "volumen_tanque": volumen_tanque
+                            "volumen_tanque": volumen_tanque,
+                            "sello_digital": sello_info["sello"]
                         }).execute()
                         
                         if res_receta.data:
@@ -781,6 +906,7 @@ with tab_nueva_receta:
                                 objetivo=objetivo_aplicacion,
                                 volumen_tanque=volumen_tanque,
                                 productos_detalle=st.session_state.productos_receta_temp,
+                                sello_digital=sello_info["sello"],
                                 logo_path="logo.png"
                             )
                             
@@ -788,7 +914,7 @@ with tab_nueva_receta:
                             st.success(f"¡Receta #{id_receta_creada} guardada con éxito (Factura: #{num_factura})!")
                             
                             st.download_button(
-                                label="📄 Descargar PDF",
+                                label="📄 Descargar PDF Con QR y Sello Digital",
                                 data=bytes(pdf_bytes),
                                 file_name=f"Receta_{id_receta_creada}_{huerta_info['nombre_huerta']}.pdf",
                                 mime="application/pdf"
@@ -797,7 +923,7 @@ with tab_nueva_receta:
                         st.error(f"Error al guardar la receta: {e}")
 
 # ==========================================
-# PESTAÑA 3: AGENDAR VISITAS (VISTA LIMPIA CON VALIDACIÓN)
+# PESTAÑA 3: AGENDAR VISITAS
 # ==========================================
 with tab_visitas:
     st.subheader("📅 Gestión de Visitas Técnicas")
@@ -841,7 +967,7 @@ with tab_visitas:
                     fecha_hora_dt = datetime.combine(fecha_v, hora_v)
 
                     try:
-                        res_ins = supabase.table("visitas").insert({
+                        supabase.table("visitas").insert({
                             "id_huerta": huerta_v_info["id_huerta"],
                             "fecha_visita": fecha_hora_dt.isoformat(),
                             "notas": notas_v
@@ -919,9 +1045,6 @@ with tab_registro:
     
     sub_tab_cli, sub_tab_hue = st.tabs(["👤 Clientes", "🌳 Huertas"])
     
-    # ------------------------------------------
-    # SUB-PESTAÑA 1: GESTIÓN DE CLIENTES
-    # ------------------------------------------
     with sub_tab_cli:
         col_f_cli, col_t_cli = st.columns([1.2, 2.8])
         
@@ -1004,9 +1127,6 @@ with tab_registro:
                             if st.button("🗑️ Borrar", key=f"del_cli_{c['id_cliente']}"):
                                 confirmar_eliminar_cliente(c)
 
-    # ------------------------------------------
-    # SUB-PESTAÑA 2: GESTIÓN DE HUERTAS
-    # ------------------------------------------
     with sub_tab_hue:
         col_f_hue, col_t_hue = st.columns([1.2, 2.8])
         

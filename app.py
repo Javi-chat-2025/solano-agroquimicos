@@ -135,7 +135,7 @@ def generar_sello_y_qr(num_factura, correo_usuario):
     }
 
 # ==========================================
-# VERIFICACIÓN PÚBLICA DE QR
+# VERIFICACIÓN PÚBLICA DE QR (DEBE IR ANTES DEL LOGIN)
 # ==========================================
 if "validar" in st.query_params:
     codigo_qr = str(st.query_params["validar"]).strip()
@@ -147,54 +147,48 @@ if "validar" in st.query_params:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            # 1. Consultar receta
-            res_receta = supabase.table("recetas").select("*").eq("sello_digital", codigo_qr).execute()
+            res_rec = supabase.table("recetas").select("*").eq("sello_digital", codigo_qr).execute()
             
-            if res_receta.data and len(res_receta.data) > 0:
-                receta = res_receta.data[0]
-                id_huerta = receta.get("id_huerta")
+            if res_rec.data and len(res_rec.data) > 0:
+                receta = res_rec.data[0]
                 
-                nombre_huerta = "N/A"
-                nombre_cliente = "Cliente General"
+                # Carga de datos de la huerta
+                res_h = supabase.table("huertas").select("nombre_huerta, id_cliente").eq("id_huerta", receta.get("id_huerta")).execute()
+                huerta_nom = res_h.data[0].get("nombre_huerta", "N/A") if res_h.data else "N/A"
+                id_cli = res_h.data[0].get("id_cliente") if res_h.data else None
                 
-                # 2. Consultar huerta
-                if id_huerta:
-                    res_h = supabase.table("huertas").select("nombre_huerta, id_cliente").eq("id_huerta", id_huerta).execute()
-                    if res_h.data:
-                        huerta_data = res_h.data[0]
-                        nombre_huerta = huerta_data.get("nombre_huerta", "N/A")
-                        id_cli = huerta_data.get("id_cliente")
-                        
-                        # 3. Consultar cliente
-                        if id_cli:
-                            res_c = supabase.table("clientes").select("nombre").eq("id_cliente", id_cli).execute()
-                            if res_c.data:
-                                nombre_cliente = res_c.data[0].get("nombre", "Cliente General")
+                # Carga de datos del cliente
+                cliente_nom = "Cliente General"
+                if id_cli:
+                    res_c = supabase.table("clientes").select("nombre").eq("id_cliente", id_cli).execute()
+                    if res_c.data:
+                        cliente_nom = res_c.data[0].get("nombre", "Cliente General")
                 
                 st.success("✅ **DOCUMENTO AUTÉNTICO Y REGISTRADO**")
                 
                 with st.container(border=True):
                     st.markdown(f"**N.° Factura / Folio:** #{receta.get('num_factura', 'N/A')}")
                     st.markdown(f"**Fecha de Emisión:** {receta.get('fecha', 'N/A')}")
-                    st.markdown(f"**Cliente:** {nombre_cliente}")
-                    st.markdown(f"**Huerta:** {nombre_huerta}")
+                    st.markdown(f"**Cliente:** {cliente_nom}")
+                    st.markdown(f"**Huerta:** {huerta_nom}")
                     st.markdown(f"**Objetivo:** {receta.get('objetivo', 'N/A')}")
                     st.markdown(f"**Sello Digital:** `{codigo_qr}`")
                     
-                st.caption("Este documento ha sido autenticado por el sistema central de Solano Agroquímicos.")
+                st.caption("Documento autenticado por el sistema de Solano Agroquímicos.")
             else:
                 st.error("❌ **DOCUMENTO NO ENCONTRADO O INVÁLIDO**")
-                st.warning("El código escaneado no coincide con ninguna receta registrada.")
+                st.caption(f"Código buscado: `{codigo_qr}`")
                 
         except Exception as e:
-            st.error(f"Error de conexión al verificar la receta: {e}")
+            st.error(f"Error al verificar la receta: {e}")
             
         st.write("")
         if st.button("⬅️ Ir al Inicio de Sesión", use_container_width=True):
             st.query_params.clear()
             st.rerun()
             
-    st.stop()
+    st.stop()  # Detiene el flujo para que NO solicite inicio de sesión
+    
 # ==========================================
 # CONTROL DE SESIÓN Y PERSISTENCIA POR COOKIES
 # ==========================================

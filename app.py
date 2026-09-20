@@ -74,11 +74,10 @@ END:VCALENDAR"""
 
 @st.cache_resource
 def init_supabase():
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
+    url = st.secrets.get("SUPABASE_URL") if "SUPABASE_URL" in st.secrets else os.getenv("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_KEY") if "SUPABASE_KEY" in st.secrets else os.getenv("SUPABASE_KEY")
+    
     return create_client(url, key)
-
-supabase = init_supabase()
 
 def obtener_siguiente_num_factura():
     try:

@@ -658,7 +658,8 @@ if not clientes:
     st.info("No se encontraron clientes registrados.")
 else:
     for c in clientes:
-        st.write(f"👤 **{c.get('nombre')}** - 📞 {c.get('telefono', 'Sin teléfono')}")        else:
+        st.write(f"👤 **{c.get('nombre')}** - 📞 {c.get('telefono', 'Sin teléfono')}")        
+else:
             st.write("")
             cols = st.columns(3)
             for idx, c in enumerate(clientes):

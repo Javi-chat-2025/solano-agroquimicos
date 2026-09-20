@@ -632,18 +632,18 @@ with tab_perfiles:
             "🔍 Buscar cliente", 
             placeholder="Escribe un nombre, teléfono o correo para filtrar..."
         )
-    # 1. Consulta con manejo de errores
+# ==========================================
+# SECCIÓN: CONSULTA Y MOSTRAR CLIENTES
+# ==========================================
 try:
     res_clientes = supabase.table("clientes").select("*").execute()
+    clientes = res_clientes.data if res_clientes.data else []
 except Exception as e:
     st.error("⚠️ ERROR DE SUPABASE DETECTADO:")
     st.code(repr(e))
     st.stop()
 
-# 2. Asignación de datos
-clientes = res_clientes.data if res_clientes.data else []
-
-# 3. Filtrado por búsqueda (si el usuario escribió algo)
+# Filtrar resultados si el usuario escribió en el buscador
 if busqueda_cliente:
     term = busqueda_cliente.lower()
     clientes = [
@@ -653,14 +653,12 @@ if busqueda_cliente:
         or term in str(c.get("correo", "")).lower()
     ]
 
-# 4. Validar si la lista está vacía
+# Mostrar la lista o la advertencia de lista vacía
 if not clientes:
-    st.info("No se encontraron clientes que coincidan con la búsqueda.")
+    st.info("No se encontraron clientes registrados.")
 else:
-    # Aquí continúa tu código habitual para mostrar la tabla o tarjetas de clientes
     for c in clientes:
-        st.write(f"👤 **{c.get('nombre')}** - 📞 {c.get('telefono', 'Sin teléfono')}")
-        else:
+        st.write(f"👤 **{c.get('nombre')}** - 📞 {c.get('telefono', 'Sin teléfono')}")        else:
             st.write("")
             cols = st.columns(3)
             for idx, c in enumerate(clientes):

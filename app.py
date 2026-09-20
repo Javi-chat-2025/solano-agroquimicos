@@ -670,10 +670,10 @@ with tab_perfiles:
                             st.session_state.cliente_sel = c
                             st.session_state.huerta_sel = None
                             st.rerun()
-    else:
-        # Aquí continúa la vista cuando un cliente ya fue seleccionado
-        pass
 
+    # Se conecta directamente con el flujo de selección de huertas
+    elif st.session_state.cliente_sel is not None and st.session_state.huerta_sel is None:
+        # Tu código existente para mostrar las huertas del cliente...    
     elif st.session_state.cliente_sel is not None and st.session_state.huerta_sel is None:
         cliente = st.session_state.cliente_sel
         

@@ -129,7 +129,7 @@ def generar_sello_y_qr(num_factura, correo_usuario):
     }
 
 # ==========================================
-# VERIFICACIÓN PÚBLICA DE QR (CORREGIDA Y ROBUSTA)
+# VERIFICACIÓN PÚBLICA DE QR
 # ==========================================
 if "validar" in st.query_params:
     codigo_qr = str(st.query_params["validar"]).strip()
@@ -141,20 +141,29 @@ if "validar" in st.query_params:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            # Step 1: Obtener receta y datos de la huerta
-            res = supabase.table("recetas").select("*, huertas(nombre_huerta, id_cliente)").eq("sello_digital", codigo_qr).execute()
+            # 1. Consultar receta
+            res_receta = supabase.table("recetas").select("*").eq("sello_digital", codigo_qr).execute()
             
-            if res.data and len(res.data) > 0:
-                receta = res.data[0]
-                huerta_info = receta.get("huertas") or {}
-                id_cliente = huerta_info.get("id_cliente")
+            if res_receta.data and len(res_receta.data) > 0:
+                receta = res_receta.data[0]
+                id_huerta = receta.get("id_huerta")
                 
-                # Step 2: Obtener el cliente de forma independiente para evitar fallos de relación anidada
+                nombre_huerta = "N/A"
                 nombre_cliente = "Cliente General"
-                if id_cliente:
-                    res_cli = supabase.table("clientes").select("nombre").eq("id_cliente", id_cliente).execute()
-                    if res_cli.data:
-                        nombre_cliente = res_cli.data[0].get("nombre", "Cliente General")
+                
+                # 2. Consultar huerta
+                if id_huerta:
+                    res_h = supabase.table("huertas").select("nombre_huerta, id_cliente").eq("id_huerta", id_huerta).execute()
+                    if res_h.data:
+                        huerta_data = res_h.data[0]
+                        nombre_huerta = huerta_data.get("nombre_huerta", "N/A")
+                        id_cli = huerta_data.get("id_cliente")
+                        
+                        # 3. Consultar cliente
+                        if id_cli:
+                            res_c = supabase.table("clientes").select("nombre").eq("id_cliente", id_cli).execute()
+                            if res_c.data:
+                                nombre_cliente = res_c.data[0].get("nombre", "Cliente General")
                 
                 st.success("✅ **DOCUMENTO AUTÉNTICO Y REGISTRADO**")
                 
@@ -162,7 +171,7 @@ if "validar" in st.query_params:
                     st.markdown(f"**N.° Factura / Folio:** #{receta.get('num_factura', 'N/A')}")
                     st.markdown(f"**Fecha de Emisión:** {receta.get('fecha', 'N/A')}")
                     st.markdown(f"**Cliente:** {nombre_cliente}")
-                    st.markdown(f"**Huerta:** {huerta_info.get('nombre_huerta', 'N/A')}")
+                    st.markdown(f"**Huerta:** {nombre_huerta}")
                     st.markdown(f"**Objetivo:** {receta.get('objetivo', 'N/A')}")
                     st.markdown(f"**Sello Digital:** `{codigo_qr}`")
                     
@@ -172,8 +181,7 @@ if "validar" in st.query_params:
                 st.warning("El código escaneado no coincide con ninguna receta registrada.")
                 
         except Exception as e:
-            st.error(f"Error al verificar la receta: {e}")
-            st.info("💡 **Sugerencia:** Asegúrate de ejecutar las políticas de acceso SELECT (RLS) en Supabase para el rol anónimo.")
+            st.error(f"Error de conexión al verificar la receta: {e}")
             
         st.write("")
         if st.button("⬅️ Ir al Inicio de Sesión", use_container_width=True):

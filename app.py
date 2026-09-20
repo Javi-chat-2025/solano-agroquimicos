@@ -1259,11 +1259,91 @@ with tab_registro:
                                 confirmar_eliminar_huerta(h)
 
 # ==========================================
-# PESTAÑA 5: CATÁLOGO DE PRODUCTOS (CRUD)
+# PESTAÑA 5: CATÁLOGO DE PRODUCTOS (CRUD Y EXCEL)
 # ==========================================
 with tab_productos:
     st.subheader("🧪 Catálogo de Productos Agroquímicos")
     
+    # --------------------------------------
+    # MÓDULO DE IMPORTACIÓN MASIVA DESDE EXCEL
+    # --------------------------------------
+    with st.expander("📥 Importar o Actualizar Productos mediante Excel / CSV", expanded=False):
+        col_ex1, col_ex2 = st.columns([2, 1])
+        
+        with col_ex1:
+            st.markdown("##### Subir archivo de Excel")
+            st.caption("Asegúrate de que las columnas del Excel se llamen exactamente así: `id_producto`, `nombre_comercial`, `nombre_tecnico`, `concentracion`, `formulacion`, `uso`.")
+            
+            archivo_excel = st.file_uploader("Selecciona tu archivo (.xlsx o .csv)", type=["xlsx", "xls", "csv"])
+            
+            if archivo_excel is not None:
+                try:
+                    if archivo_excel.name.endswith('.csv'):
+                        df_import = pd.read_csv(archivo_excel)
+                    else:
+                        df_import = pd.read_excel(archivo_excel)
+                    
+                    st.write("🔍 **Vista previa de los datos a importar:**")
+                    st.dataframe(df_import.head(5), use_container_width=True)
+                    
+                    cols_requeridas = {"id_producto", "nombre_comercial"}
+                    cols_presentes = set(df_import.columns)
+                    
+                    if not cols_requeridas.issubset(cols_presentes):
+                        st.error(f"❌ Al archivo le faltan columnas obligatorias: {cols_requeridas - cols_presentes}")
+                    else:
+                        if st.button("🚀 Cargar Productos a la Base de Datos", type="primary"):
+                            df_import = df_import.fillna("")
+                            registros = df_import.to_dict(orient="records")
+                            
+                            supabase.table("productos").upsert(registros).execute()
+                            st.success(f"✅ ¡Se han importado/actualizado {len(registros)} productos con éxito!")
+                            st.rerun()
+                            
+                except Exception as e:
+                    st.error(f"Error al procesar el archivo Excel: {e}")
+                    
+        with col_ex2:
+            st.markdown("##### Descargar Plantilla")
+            st.caption("Usa esta plantilla base para rellenar tus productos en Excel:")
+            
+            df_plantilla = pd.DataFrame([
+                {
+                    "id_producto": "PROD-001",
+                    "nombre_comercial": "Amistar Extra",
+                    "nombre_tecnico": "Azoxistrobin + Ciproconazol",
+                    "concentracion": "200 g/L",
+                    "formulacion": "Suspensión Concentrada (SC)",
+                    "uso": "Fungicida de amplio espectro"
+                },
+                {
+                    "id_producto": "PROD-002",
+                    "nombre_comercial": "Akron 300",
+                    "nombre_tecnico": "Chlorpyrifos",
+                    "concentracion": "480 g/L",
+                    "formulacion": "Concentrado Emulsionable (EC)",
+                    "uso": "Insecticida organofosforado"
+                }
+            ])
+            
+            buffer_excel = io.BytesIO()
+            with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+                df_plantilla.to_excel(writer, index=False, sheet_name='Productos')
+            buffer_excel.seek(0)
+            
+            st.download_button(
+                label="📥 Descargar Plantilla Excel (.xlsx)",
+                data=buffer_excel,
+                file_name="Plantilla_Productos_Solano.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
+    st.write("---")
+
+    # --------------------------------------
+    # FORMULARIO MANUAL Y TABLA EXISTENTE
+    # --------------------------------------
     col_f_prod, col_t_prod = st.columns([1.2, 2.8])
     
     with col_f_prod:
@@ -1308,7 +1388,7 @@ with tab_productos:
                     st.session_state.producto_a_editar = None
                     st.rerun()
         else:
-            st.markdown("### ➕ Registrar Nuevo Producto")
+            st.markdown("### ➕ Registrar Nuevo Producto (Manual)")
             with st.form("form_nuevo_producto"):
                 id_prod_val = st.text_input("ID / Código Producto *", placeholder="Ej. PROD-001")
                 nombre_com = st.text_input("Nombre Comercial *", placeholder="Ej. Amistar Extra")

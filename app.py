@@ -77,7 +77,14 @@ def init_supabase():
     url = st.secrets.get("SUPABASE_URL") if "SUPABASE_URL" in st.secrets else os.getenv("SUPABASE_URL")
     key = st.secrets.get("SUPABASE_KEY") if "SUPABASE_KEY" in st.secrets else os.getenv("SUPABASE_KEY")
     
+    if not url or not key:
+        st.error("⚠️ Faltan la URL o la KEY de Supabase en las configuraciones (Secrets).")
+        st.stop()
+        
     return create_client(url, key)
+
+# ESTA LÍNEA ES OBLIGATORIA EN EL FLUJO PRINCIPAL:
+supabase = init_supabase()
 
 def obtener_siguiente_num_factura():
     try:

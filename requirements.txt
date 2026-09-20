@@ -1,8 +1,8 @@
 streamlit
+pandas
+openpyxl
 supabase
 fpdf2
-pandas
-python-dotenv
-extra-streamlit-components
+extra_streamlit_components
 qrcode
-Pillow
+python-dotenv

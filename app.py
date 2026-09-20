@@ -138,19 +138,15 @@ if "validar" in st.query_params:
     st.markdown("<h4 style='text-align: center;'>Verificación de Autenticidad de Receta</h4>", unsafe_allow_html=True)
     st.write("---")
     
-    col1, col2, col3 = st.columns([0.5, 3, 0.5])
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            res = supabase.table("recetas").select(
-                "*, huertas(nombre_huerta, clientes(nombre)), "
-                "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, concentracion, formulacion, uso))"
-            ).eq("sello_digital", codigo_qr).execute()
+            res = supabase.table("recetas").select("*, huertas(nombre_huerta, clientes(nombre))").eq("sello_digital", codigo_qr).execute()
             
             if res.data and len(res.data) > 0:
                 receta = res.data[0]
                 huerta_info = receta.get("huertas") or {}
                 cliente_info = huerta_info.get("clientes") or {}
-                detalles = receta.get("receta_detalles", [])
                 
                 st.success("✅ **DOCUMENTO AUTÉNTICO Y REGISTRADO**")
                 
@@ -160,30 +156,12 @@ if "validar" in st.query_params:
                     st.markdown(f"**Cliente:** {cliente_info.get('nombre', 'Cliente General')}")
                     st.markdown(f"**Huerta:** {huerta_info.get('nombre_huerta', 'N/A')}")
                     st.markdown(f"**Objetivo:** {receta.get('objetivo', 'N/A')}")
-                    st.markdown(f"**Volumen del Tanque:** {receta.get('volumen_tanque', 'N/A')}")
                     st.markdown(f"**Sello Digital:** `{codigo_qr}`")
                     
-                    st.markdown("---")
-                    st.markdown("### 🧪 Productos Recetados")
-                    
-                    if detalles:
-                        prods_tabla = []
-                        for d in detalles:
-                            p = d.get("productos") or {}
-                            prods_tabla.append({
-                                "Código": p.get("id_producto", "-"),
-                                "Producto Comercial": p.get("nombre_comercial", "-"),
-                                "Ingrediente Activo": p.get("nombre_tecnico", "-"),
-                                "Dosis Recomendada": f"{d.get('dosis', '')} {d.get('unidad', '')}".strip()
-                            })
-                        st.dataframe(pd.DataFrame(prods_tabla), use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Esta receta no incluye productos detallados en el registro.")
-                    
-                st.caption("Este documento ha sido autenticado en tiempo real por el sistema central de Solano Agroquímicos.")
+                st.caption("Este documento ha sido autenticado por el sistema central de Solano Agroquímicos.")
             else:
                 st.error("❌ **DOCUMENTO NO ENCONTRADO O INVÁLIDO**")
-                st.warning("El código escaneado no coincide con ninguna receta registrada en nuestro sistema central.")
+                st.warning("El código escaneado no coincide con ninguna receta registrada.")
                 
         except Exception as e:
             st.error(f"Error al verificar la receta: {e}")
@@ -374,7 +352,7 @@ tab_perfiles, tab_nueva_receta, tab_visitas, tab_registro, tab_productos = st.ta
 ])
 
 # ==========================================
-# GENERADOR DE PDF CON CÓDIGO QR Y SELLO DIGITAL
+# GENERADOR DE PDF CORREGIDO (SIN HOJAS MUERTAS)
 # ==========================================
 def generar_pdf_estilo_solano(
     empresa="SOLANO AGROQUÍMICOS",
@@ -398,8 +376,11 @@ def generar_pdf_estilo_solano(
         fecha = obtener_fecha_actual()
         
     pdf = FPDF()
+    pdf.set_margins(10, 10, 10)
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=32)
+    
+    # Salto de página automático reservando el área inferior para el pie de página
+    pdf.set_auto_page_break(auto=True, margin=45)
     
     def dividir_texto_en_lineas(texto, max_w):
         txt = str(texto or "").replace("—", "-").strip()
@@ -444,14 +425,14 @@ def generar_pdf_estilo_solano(
         pdf.image(logo_path, x=10, y=8, w=28)
     
     # TÍTULO PRINCIPAL
-    pdf.set_font("Helvetica", "B", 15)
+    pdf.set_font("Helvetica", "B", 14)
     pdf.set_text_color(*C_DARK)
-    pdf.cell(0, 8, "RECETA DE APLICACIÓN", ln=True, align="C")
+    pdf.cell(0, 6, "RECETA DE APLICACIÓN", ln=True, align="C")
     
     pdf.set_draw_color(210, 210, 210)
-    pdf.line(10, 36, 200, 36)
+    pdf.line(10, 34, 200, 34)
     
-    y_start = 24
+    y_start = 22
     x_empresa = 42 if os.path.exists(logo_path) else 10
     
     # ENCABEZADO Y FOLIO
@@ -467,36 +448,36 @@ def generar_pdf_estilo_solano(
     pdf.text(138, y_start + 5, f"N.° FACTURA:   {num_factura}")
     pdf.text(138, y_start + 9, f"ID. CLIENTE:   {id_cliente}")
     
-    pdf.set_y(40)
+    pdf.set_y(36)
     
     # DATOS CLIENTE Y HUERTA
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*C_GRAY)
-    pdf.cell(0, 5, "RECETAR A", ln=True)
+    pdf.cell(0, 4, "RECETAR A", ln=True)
     
     pdf.set_fill_color(*C_BLUE)
     pdf.set_text_color(*C_WHITE)
-    pdf.set_font("Helvetica", "B", 8.5)
-    pdf.cell(140, 5.5, f"  Cliente: {cliente_nombre}", fill=True, ln=True)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.cell(140, 5, f"  Cliente: {cliente_nombre}", fill=True, ln=True)
     
     pdf.set_fill_color(*C_GREEN)
-    pdf.cell(140, 5.5, f"  Nombre de la Huerta: {huerta_nombre}", fill=True, ln=True)
+    pdf.cell(140, 5, f"  Nombre de la Huerta: {huerta_nombre}", fill=True, ln=True)
     
     if huerta_ubicacion:
         pdf.set_fill_color(*C_DARK_GREEN)
-        pdf.cell(140, 5.5, f"  Ubicación: {huerta_ubicacion}", fill=True, ln=True)
+        pdf.cell(140, 5, f"  Ubicación: {huerta_ubicacion}", fill=True, ln=True)
         
-    pdf.ln(3)
+    pdf.ln(2)
     
     # OBJETIVO DE APLICACIÓN
-    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*C_DARK)
-    pdf.cell(0, 5, "OBJETIVO DE LA APLICACIÓN", ln=True, align="C")
+    pdf.cell(0, 4, "OBJETIVO DE LA APLICACIÓN", ln=True, align="C")
     
     pdf.set_fill_color(*C_YELLOW)
     pdf.set_font("Helvetica", "I", 8)
-    pdf.cell(0, 6, f"{objetivo}", fill=True, ln=True, align="C")
-    pdf.ln(3)
+    pdf.cell(0, 5, f"{objetivo}", fill=True, ln=True, align="C")
+    pdf.ln(2)
     
     # TABLA DE PRODUCTOS
     w_id = 14
@@ -511,13 +492,13 @@ def generar_pdf_estilo_solano(
     pdf.set_text_color(*C_WHITE)
     pdf.set_font("Helvetica", "B", 7.5)
     
-    pdf.cell(w_id, 7, "Id Prod", fill=True, align="C")
-    pdf.cell(w_com, 7, "Nombre Comercial", fill=True, align="C")
-    pdf.cell(w_tec, 7, "Nombre Técnico", fill=True, align="C")
-    pdf.cell(w_conc, 7, "Concentración", fill=True, align="C")
-    pdf.cell(w_tipo, 7, "Formulación", fill=True, align="C")
-    pdf.cell(w_func, 7, "Uso", fill=True, align="C")
-    pdf.cell(w_cant, 7, f"Cant. / {volumen_tanque}", fill=True, align="C", ln=True)
+    pdf.cell(w_id, 6, "Id Prod", fill=True, align="C")
+    pdf.cell(w_com, 6, "Nombre Comercial", fill=True, align="C")
+    pdf.cell(w_tec, 6, "Nombre Técnico", fill=True, align="C")
+    pdf.cell(w_conc, 6, "Concentración", fill=True, align="C")
+    pdf.cell(w_tipo, 6, "Formulación", fill=True, align="C")
+    pdf.cell(w_func, 6, "Uso", fill=True, align="C")
+    pdf.cell(w_cant, 6, f"Cant. / {volumen_tanque}", fill=True, align="C", ln=True)
     
     pdf.set_font("Helvetica", "", 7)
     pdf.set_draw_color(220, 220, 220)
@@ -544,10 +525,10 @@ def generar_pdf_estilo_solano(
         ]
         
         max_num_lines = max([len(lines) for _, lines, _ in col_data])
-        line_height = 3.8
-        row_h = max(max_num_lines * line_height + 3, 7.0)
+        line_height = 3.5
+        row_h = max(max_num_lines * line_height + 2.5, 6.0)
         
-        if pdf.get_y() + row_h > 240:
+        if pdf.get_y() + row_h > 235:
             pdf.add_page()
             
         y_pos = pdf.get_y()
@@ -562,7 +543,7 @@ def generar_pdf_estilo_solano(
             pdf.line(x_pos, y_pos + row_h, x_pos + w, y_pos + row_h)
             
             content_h = len(lines) * line_height
-            y_start_line = y_pos + (row_h - content_h) / 2 + 2.8
+            y_start_line = y_pos + (row_h - content_h) / 2 + 2.4
             
             for idx_line, line_str in enumerate(lines):
                 txt_w = pdf.get_string_width(line_str)
@@ -573,15 +554,18 @@ def generar_pdf_estilo_solano(
             
         pdf.set_y(y_pos + row_h)
         
-    pdf.ln(6)
+    pdf.ln(4)
     
     # DATOS DEL ASESOR
+    if pdf.get_y() > 235:
+        pdf.add_page()
+
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*C_DARK)
-    pdf.cell(0, 4, asesor_nombre, ln=True, align="C")
+    pdf.cell(0, 3.5, asesor_nombre, ln=True, align="C")
     pdf.set_font("Helvetica", "", 7)
-    pdf.cell(0, 3.5, asesor_ced, ln=True, align="C")
-    pdf.cell(0, 3.5, asesor_rfc, ln=True, align="C")
+    pdf.cell(0, 3.0, asesor_ced, ln=True, align="C")
+    pdf.cell(0, 3.0, asesor_rfc, ln=True, align="C")
     
     # Generar sello digital y QR si no viene proporcionado
     correo_usr = st.session_state.usuario.get("correo", "info@solano.com") if st.session_state.usuario else "info@solano.com"
@@ -589,8 +573,9 @@ def generar_pdf_estilo_solano(
     sello_texto = sello_digital if sello_digital else datos_qr["sello"]
     
     # ESTAMPADO DE VERIFICACIÓN AL PIE DE PÁGINA
-    pdf.set_y(-30)
-    y_sello = pdf.get_y()
+    # SE DESACTIVA AUTO_PAGE_BREAK PARA EVITAR LA CREACIÓN DE HOJAS FANTASMA/VACÍAS
+    pdf.set_auto_page_break(auto=False)
+    y_sello = 262  # Posición fija en mm en la parte inferior de la hoja A4 (297 mm)
     
     pdf.set_fill_color(248, 249, 250)
     pdf.set_draw_color(200, 210, 220)
@@ -618,7 +603,7 @@ def generar_pdf_estilo_solano(
     pdf.set_text_color(120, 120, 120)
     pdf.cell(0, 3.5, "Escanee el código QR para validar este documento oficialmente en el sistema.", ln=True)
     
-    return pdf.output()
+    return bytes(pdf.output())
 
 # ==========================================
 # PESTAÑA 1: EXPLORADOR POR PERFILES
@@ -774,7 +759,7 @@ with tab_perfiles:
                         
                         st.download_button(
                             label="⬇️ Descargar PDF",
-                            data=bytes(pdf_bytes),
+                            data=pdf_bytes,
                             file_name=f"Receta_{r['id_receta']}_{huerta['nombre_huerta']}.pdf",
                             mime="application/pdf",
                             key=f"dl_pdf_{r['id_receta']}",
@@ -892,7 +877,6 @@ with tab_nueva_receta:
             with col_b2:
                 if st.button("💾 Guardar Receta y Generar PDF", type="primary"):
                     try:
-                        # Generar sello digital único
                         sello_info = generar_sello_y_qr(num_factura, st.session_state.usuario.get("correo"))
                         
                         res_receta = supabase.table("recetas").insert({
@@ -937,7 +921,7 @@ with tab_nueva_receta:
                             
                             st.download_button(
                                 label="📄 Descargar PDF Con QR y Sello Digital",
-                                data=bytes(pdf_bytes),
+                                data=pdf_bytes,
                                 file_name=f"Receta_{id_receta_creada}_{huerta_info['nombre_huerta']}.pdf",
                                 mime="application/pdf"
                             )

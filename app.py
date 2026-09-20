@@ -632,18 +632,25 @@ with tab_perfiles:
             "🔍 Buscar cliente", 
             placeholder="Escribe un nombre, teléfono o correo para filtrar..."
         )
-        
-        res_clientes = supabase.table("clientes").select("*").execute()
-        clientes = res_clientes.data if res_clientes.data else []
-        
-        if busqueda_cliente:
-            term = busqueda_cliente.lower()
-            clientes = [
-                c for c in clientes 
-                if term in str(c.get("nombre", "")).lower() 
-                or term in str(c.get("telefono", "")).lower() 
-                or term in str(c.get("correo", "")).lower()
-            ]
+       # 1. Intentar la consulta y capturar el error si ocurre
+try:
+    res_clientes = supabase.table("clientes").select("*").execute()
+except Exception as e:
+    st.error("⚠️ ERROR DE SUPABASE DETECTADO:")
+    st.code(repr(e))
+    st.stop()
+
+# 2. Si la consulta fue exitosa, continúa el flujo normal (sin indentación extra)
+clientes = res_clientes.data if res_clientes.data else []
+
+if busqueda_cliente:
+    term = busqueda_cliente.lower()
+    clientes = [
+        c for c in clientes 
+        if term in str(c.get("nombre", "")).lower() 
+        or term in str(c.get("telefono", "")).lower() 
+        or term in str(c.get("correo", "")).lower()
+    ]
         
         if not clientes:
             st.info("No se encontraron clientes registrados o que coincidan con la búsqueda.")

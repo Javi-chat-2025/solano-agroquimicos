@@ -129,10 +129,10 @@ def generar_sello_y_qr(num_factura, correo_usuario):
     }
 
 # ==========================================
-# VERIFICACIÓN PÚBLICA DE QR (SIN NECESIDAD DE LOGIN)
+# VERIFICACIÓN PÚBLICA DE QR (CORREGIDA Y ROBUSTA)
 # ==========================================
 if "validar" in st.query_params:
-    codigo_qr = st.query_params["validar"]
+    codigo_qr = str(st.query_params["validar"]).strip()
     
     st.markdown("<h2 style='text-align: center; color: #1b4332;'>🥑 Solano Agroquímicos</h2>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align: center;'>Verificación de Autenticidad de Receta</h4>", unsafe_allow_html=True)
@@ -141,19 +141,27 @@ if "validar" in st.query_params:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            res = supabase.table("recetas").select("*, huertas(nombre_huerta, clientes(nombre))").eq("sello_digital", codigo_qr).execute()
+            # Step 1: Obtener receta y datos de la huerta
+            res = supabase.table("recetas").select("*, huertas(nombre_huerta, id_cliente)").eq("sello_digital", codigo_qr).execute()
             
             if res.data and len(res.data) > 0:
                 receta = res.data[0]
                 huerta_info = receta.get("huertas") or {}
-                cliente_info = huerta_info.get("clientes") or {}
+                id_cliente = huerta_info.get("id_cliente")
+                
+                # Step 2: Obtener el cliente de forma independiente para evitar fallos de relación anidada
+                nombre_cliente = "Cliente General"
+                if id_cliente:
+                    res_cli = supabase.table("clientes").select("nombre").eq("id_cliente", id_cliente).execute()
+                    if res_cli.data:
+                        nombre_cliente = res_cli.data[0].get("nombre", "Cliente General")
                 
                 st.success("✅ **DOCUMENTO AUTÉNTICO Y REGISTRADO**")
                 
                 with st.container(border=True):
                     st.markdown(f"**N.° Factura / Folio:** #{receta.get('num_factura', 'N/A')}")
                     st.markdown(f"**Fecha de Emisión:** {receta.get('fecha', 'N/A')}")
-                    st.markdown(f"**Cliente:** {cliente_info.get('nombre', 'Cliente General')}")
+                    st.markdown(f"**Cliente:** {nombre_cliente}")
                     st.markdown(f"**Huerta:** {huerta_info.get('nombre_huerta', 'N/A')}")
                     st.markdown(f"**Objetivo:** {receta.get('objetivo', 'N/A')}")
                     st.markdown(f"**Sello Digital:** `{codigo_qr}`")
@@ -165,6 +173,7 @@ if "validar" in st.query_params:
                 
         except Exception as e:
             st.error(f"Error al verificar la receta: {e}")
+            st.info("💡 **Sugerencia:** Asegúrate de ejecutar las políticas de acceso SELECT (RLS) en Supabase para el rol anónimo.")
             
         st.write("")
         if st.button("⬅️ Ir al Inicio de Sesión", use_container_width=True):
@@ -172,7 +181,6 @@ if "validar" in st.query_params:
             st.rerun()
             
     st.stop()
-
 # ==========================================
 # CONTROL DE SESIÓN Y PERSISTENCIA POR COOKIES
 # ==========================================

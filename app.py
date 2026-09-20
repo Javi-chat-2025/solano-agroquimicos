@@ -632,34 +632,30 @@ with tab_perfiles:
             "🔍 Buscar cliente", 
             placeholder="Escribe un nombre, teléfono o correo para filtrar..."
         )
-# ==========================================
-# SECCIÓN: CONSULTA Y MOSTRAR CLIENTES
-# ==========================================
-try:
-    res_clientes = supabase.table("clientes").select("*").execute()
-    clientes = res_clientes.data if res_clientes.data else []
-except Exception as e:
-    st.error("⚠️ ERROR DE SUPABASE DETECTADO:")
-    st.code(repr(e))
-    st.stop()
 
-# Filtrar resultados si el usuario escribió en el buscador
-if busqueda_cliente:
-    term = busqueda_cliente.lower()
-    clientes = [
-        c for c in clientes 
-        if term in str(c.get("nombre", "")).lower() 
-        or term in str(c.get("telefono", "")).lower() 
-        or term in str(c.get("correo", "")).lower()
-    ]
+        # SECCIÓN: CONSULTA A SUPABASE
+        try:
+            res_clientes = supabase.table("clientes").select("*").execute()
+            clientes = res_clientes.data if res_clientes.data else []
+        except Exception as e:
+            st.error("⚠️ ERROR DE SUPABASE DETECTADO:")
+            st.code(repr(e))
+            st.stop()
 
-# Mostrar la lista o la advertencia de lista vacía
-if not clientes:
-    st.info("No se encontraron clientes registrados.")
-else:
-    for c in clientes:
-        st.write(f"👤 **{c.get('nombre')}** - 📞 {c.get('telefono', 'Sin teléfono')}")        
-else:
+        # Filtrar resultados si el usuario escribió en el buscador
+        if busqueda_cliente:
+            term = busqueda_cliente.lower()
+            clientes = [
+                c for c in clientes 
+                if term in str(c.get("nombre", "")).lower() 
+                or term in str(c.get("telefono", "")).lower() 
+                or term in str(c.get("correo", "")).lower()
+            ]
+
+        # Mostrar tarjetas de clientes o aviso si está vacío
+        if not clientes:
+            st.info("No se encontraron clientes registrados.")
+        else:
             st.write("")
             cols = st.columns(3)
             for idx, c in enumerate(clientes):
@@ -674,6 +670,9 @@ else:
                             st.session_state.cliente_sel = c
                             st.session_state.huerta_sel = None
                             st.rerun()
+    else:
+        # Aquí continúa la vista cuando un cliente ya fue seleccionado
+        pass
 
     elif st.session_state.cliente_sel is not None and st.session_state.huerta_sel is None:
         cliente = st.session_state.cliente_sel

@@ -22,7 +22,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Cambia esta URL por el enlace público de tu app desplegada
 URL_BASE_APP = "https://solano-agroquimicos.streamlit.app"
 
 # ==========================================
@@ -39,13 +38,12 @@ cargar_css("style.css")
 # FUNCIONES AUXILIARES GENERALES
 # ==========================================
 def obtener_fecha_actual():
-    ahora = datetime.now()
-    return ahora.strftime("%d/%m/%Y")
+    return datetime.now().strftime("%d/%m/%Y")
 
 def formatear_id_cliente(id_raw):
     if id_raw is None:
         return "N/A"
-    if isinstance(id_raw, int) or (isinstance(id_raw, str) and id_raw.isdigit()):
+    if isinstance(id_raw, int) or (isinstance(id_raw, str) and str(id_raw).isdigit()):
         return f"CLI-{int(id_raw):04d}"
     return str(id_raw)
 
@@ -76,6 +74,9 @@ END:VCALENDAR"""
 def init_supabase():
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY")
+    if not url or not key:
+        st.error("⚠️ Faltan las credenciales de Supabase en las variables de entorno.")
+        st.stop()
     return create_client(url, key)
 
 supabase = init_supabase()
@@ -176,9 +177,6 @@ if "validar" in st.query_params:
 # ==========================================
 # CONTROL DE SESIÓN Y PERSISTENCIA POR COOKIES
 # ==========================================
-if "session" in st.query_params:
-    st.query_params.clear()
-
 cookie_manager = stx.CookieManager(key="solano_cookie_manager")
 
 if "autenticado" not in st.session_state:
@@ -186,15 +184,14 @@ if "autenticado" not in st.session_state:
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
 
-solano_cookie = cookie_manager.get(cookie="solano_session")
-
-if solano_cookie and not st.session_state.autenticado:
-    try:
+try:
+    solano_cookie = cookie_manager.get(cookie="solano_session")
+    if solano_cookie and not st.session_state.autenticado:
         user_data = json.loads(solano_cookie) if isinstance(solano_cookie, str) else solano_cookie
         st.session_state.autenticado = True
         st.session_state.usuario = user_data
-    except Exception:
-        pass
+except Exception:
+    pass
 
 def pantalla_login():
     col1, col2, col3 = st.columns([1, 1.2, 1])
@@ -246,19 +243,13 @@ if not st.session_state.autenticado:
     pantalla_login()
     st.stop()
 
-# Estado de variables de navegación interna
-if "cliente_sel" not in st.session_state:
-    st.session_state.cliente_sel = None
-if "huerta_sel" not in st.session_state:
-    st.session_state.huerta_sel = None
+# Inicialización de variables de sesión
+for key in ["cliente_sel", "huerta_sel", "producto_a_editar", "cliente_a_editar", "huerta_a_editar"]:
+    if key not in st.session_state:
+        st.session_state[key] = None
+
 if "productos_receta_temp" not in st.session_state:
     st.session_state.productos_receta_temp = []
-if "producto_a_editar" not in st.session_state:
-    st.session_state.producto_a_editar = None
-if "cliente_a_editar" not in st.session_state:
-    st.session_state.cliente_a_editar = None
-if "huerta_a_editar" not in st.session_state:
-    st.session_state.huerta_a_editar = None
 
 # ==========================================
 # DIÁLOGOS DE CONFIRMACIÓN DE ELIMINACIÓN
@@ -335,7 +326,10 @@ with col_titulo_web:
 with col_user:
     st.write(f"👤 **{st.session_state.usuario.get('nombre', 'Usuario')}**")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
-        cookie_manager.delete("solano_session", key="delete_solano_session")
+        try:
+            cookie_manager.delete("solano_session", key="delete_solano_session")
+        except Exception:
+            pass
         st.session_state.autenticado = False
         st.session_state.usuario = None
         st.rerun()
@@ -365,19 +359,22 @@ def generar_pdf_estilo_solano(
     huerta_ubicacion="Apatzingán, Michoacán",
     objetivo="Aplicación agrícola",
     volumen_tanque="2000 litros",
-    productos_detalle=[],
+    productos_detalle=None,
     asesor_nombre="Q.F.B. Jose Luis Infante Magaña",
     asesor_ced="Ced: 10649771",
     asesor_rfc="RFC: IAML9204182U2",
     sello_digital=None,
     logo_path="logo.png"
 ):
+    if productos_detalle is None:
+        productos_detalle = []
     if not fecha:
         fecha = obtener_fecha_actual()
         
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=32)
+    pdf.set_font("Helvetica", "", 7)
     
     def dividir_texto_en_lineas(texto, max_w):
         txt = str(texto or "").replace("—", "-").strip()
@@ -561,7 +558,7 @@ def generar_pdf_estilo_solano(
     pdf.cell(0, 3.5, asesor_ced, ln=True, align="C")
     pdf.cell(0, 3.5, asesor_rfc, ln=True, align="C")
     
-    # Generar sello digital y QR si no viene proporcionado
+    # Generar sello digital y QR
     correo_usr = st.session_state.usuario.get("correo", "info@solano.com") if st.session_state.usuario else "info@solano.com"
     datos_qr = generar_sello_y_qr(num_factura, correo_usr)
     sello_texto = sello_digital if sello_digital else datos_qr["sello"]
@@ -610,8 +607,12 @@ with tab_perfiles:
             placeholder="Escribe un nombre, teléfono o correo para filtrar..."
         )
         
-        res_clientes = supabase.table("clientes").select("*").execute()
-        clientes = res_clientes.data if res_clientes.data else []
+        try:
+            res_clientes = supabase.table("clientes").select("*").execute()
+            clientes = res_clientes.data if res_clientes.data else []
+        except Exception as e:
+            st.error(f"Error al cargar clientes: {e}")
+            clientes = []
         
         if busqueda_cliente:
             term = busqueda_cliente.lower()
@@ -654,8 +655,12 @@ with tab_perfiles:
 
         st.write("---")
         
-        res_huertas = supabase.table("huertas").select("*").eq("id_cliente", cliente["id_cliente"]).execute()
-        huertas = res_huertas.data if res_huertas.data else []
+        try:
+            res_huertas = supabase.table("huertas").select("*").eq("id_cliente", cliente["id_cliente"]).execute()
+            huertas = res_huertas.data if res_huertas.data else []
+        except Exception as e:
+            st.error(f"Error al obtener huertas: {e}")
+            huertas = []
         
         if not huertas:
             st.info(f"El cliente '{cliente['nombre']}' no tiene huertas registradas.")
@@ -687,12 +692,15 @@ with tab_perfiles:
 
         st.write("---")
         
-        res_recetas = supabase.table("recetas").select(
-            "id_receta, fecha, num_factura, objetivo, volumen_tanque, sello_digital, "
-            "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, concentracion, formulacion, uso))"
-        ).eq("id_huerta", huerta["id_huerta"]).order("id_receta", desc=True).execute()
-        
-        recetas = res_recetas.data if res_recetas.data else []
+        try:
+            res_recetas = supabase.table("recetas").select(
+                "id_receta, fecha, num_factura, objetivo, volumen_tanque, sello_digital, "
+                "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, concentracion, formulacion, uso))"
+            ).eq("id_huerta", huerta["id_huerta"]).order("id_receta", desc=True).execute()
+            recetas = res_recetas.data if res_recetas.data else []
+        except Exception as e:
+            st.error(f"Error al consultar recetas: {e}")
+            recetas = []
         
         if not recetas:
             st.info(f"No hay recetas emitidas para la huerta '{huerta['nombre_huerta']}'.")
@@ -765,8 +773,13 @@ with tab_perfiles:
 with tab_nueva_receta:
     st.subheader("Emitir Nueva Receta")
     
-    huertas_data = supabase.table("huertas").select("id_huerta, nombre_huerta, ubicacion, id_cliente, clientes(id_cliente, nombre)").execute().data
-    productos_data = supabase.table("productos").select("*").execute().data
+    try:
+        huertas_data = supabase.table("huertas").select("id_huerta, nombre_huerta, ubicacion, id_cliente, clientes(id_cliente, nombre)").execute().data
+        productos_data = supabase.table("productos").select("*").execute().data
+    except Exception as e:
+        st.error(f"Error al obtener datos: {e}")
+        huertas_data = []
+        productos_data = []
     
     if not huertas_data or not productos_data:
         st.warning("⚠️ Asegúrate de tener al menos una huerta y un producto registrados.")
@@ -870,7 +883,6 @@ with tab_nueva_receta:
             with col_b2:
                 if st.button("💾 Guardar Receta y Generar PDF", type="primary"):
                     try:
-                        # Generar sello digital único
                         sello_info = generar_sello_y_qr(num_factura, st.session_state.usuario.get("correo"))
                         
                         res_receta = supabase.table("recetas").insert({
@@ -1066,15 +1078,18 @@ with tab_registro:
                     
                     if guardar_cli_edit:
                         if edit_nombre and edit_correo:
-                            supabase.table("clientes").update({
-                                "nombre": edit_nombre,
-                                "telefono": edit_telefono,
-                                "correo": edit_correo
-                            }).eq("id_cliente", cli_edit["id_cliente"]).execute()
-                            
-                            st.session_state.cliente_a_editar = None
-                            st.success("¡Cliente actualizado!")
-                            st.rerun()
+                            try:
+                                supabase.table("clientes").update({
+                                    "nombre": edit_nombre,
+                                    "telefono": edit_telefono,
+                                    "correo": edit_correo
+                                }).eq("id_cliente", cli_edit["id_cliente"]).execute()
+                                
+                                st.session_state.cliente_a_editar = None
+                                st.success("¡Cliente actualizado!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error al actualizar cliente: {e}")
                         else:
                             st.error("Campos obligatorios (*).")
                             
@@ -1107,8 +1122,12 @@ with tab_registro:
 
         with col_t_cli:
             st.markdown("### 📋 Clientes Registrados")
-            res_cli_all = supabase.table("clientes").select("*").order("id_cliente", desc=True).execute()
-            list_cli = res_cli_all.data if res_cli_all.data else []
+            try:
+                res_cli_all = supabase.table("clientes").select("*").order("id_cliente", desc=True).execute()
+                list_cli = res_cli_all.data if res_cli_all.data else []
+            except Exception as e:
+                st.error(f"Error al obtener clientes: {e}")
+                list_cli = []
             
             if not list_cli:
                 st.info("No hay clientes en el sistema.")
@@ -1130,8 +1149,12 @@ with tab_registro:
     with sub_tab_hue:
         col_f_hue, col_t_hue = st.columns([1.2, 2.8])
         
-        res_cli_select = supabase.table("clientes").select("id_cliente, nombre").execute()
-        cli_options = res_cli_select.data if res_cli_select.data else []
+        try:
+            res_cli_select = supabase.table("clientes").select("id_cliente, nombre").execute()
+            cli_options = res_cli_select.data if res_cli_select.data else []
+        except Exception:
+            cli_options = []
+            
         dict_cli_lookup = {f"{c['nombre']} ({formatear_id_cliente(c['id_cliente'])})": c['id_cliente'] for c in cli_options}
         
         with col_f_hue:
@@ -1163,16 +1186,19 @@ with tab_registro:
                             
                         if guardar_hue_edit:
                             if edit_nombre_h:
-                                supabase.table("huertas").update({
-                                    "nombre_huerta": edit_nombre_h,
-                                    "ubicacion": edit_ubicacion_h,
-                                    "hectareas": edit_ha_h,
-                                    "id_cliente": dict_cli_lookup[edit_cli_key]
-                                }).eq("id_huerta", hue_edit["id_huerta"]).execute()
-                                
-                                st.session_state.huerta_a_editar = None
-                                st.success("¡Huerta actualizada!")
-                                st.rerun()
+                                try:
+                                    supabase.table("huertas").update({
+                                        "nombre_huerta": edit_nombre_h,
+                                        "ubicacion": edit_ubicacion_h,
+                                        "hectareas": edit_ha_h,
+                                        "id_cliente": dict_cli_lookup[edit_cli_key]
+                                    }).eq("id_huerta", hue_edit["id_huerta"]).execute()
+                                    
+                                    st.session_state.huerta_a_editar = None
+                                    st.success("¡Huerta actualizada!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error al actualizar la huerta: {e}")
                             else:
                                 st.error("Campos obligatorios (*).")
                                 
@@ -1207,8 +1233,12 @@ with tab_registro:
 
         with col_t_hue:
             st.markdown("### 📋 Huertas Registradas")
-            res_hue_all = supabase.table("huertas").select("*, clientes(nombre)").order("id_huerta", desc=True).execute()
-            list_hue = res_hue_all.data if res_hue_all.data else []
+            try:
+                res_hue_all = supabase.table("huertas").select("*, clientes(nombre)").order("id_huerta", desc=True).execute()
+                list_hue = res_hue_all.data if res_hue_all.data else []
+            except Exception as e:
+                st.error(f"Error al consultar huertas: {e}")
+                list_hue = []
             
             if not list_hue:
                 st.info("No hay huertas registradas.")
@@ -1257,17 +1287,20 @@ with tab_productos:
                 
                 if guardar_prod_edit:
                     if nombre_com:
-                        supabase.table("productos").update({
-                            "nombre_comercial": nombre_com,
-                            "nombre_tecnico": nombre_tec,
-                            "concentracion": concentracion_val,
-                            "formulacion": formulacion_val,
-                            "uso": uso_val
-                        }).eq("id_producto", prod_edit["id_producto"]).execute()
-                        
-                        st.session_state.producto_a_editar = None
-                        st.success("¡Producto actualizado!")
-                        st.rerun()
+                        try:
+                            supabase.table("productos").update({
+                                "nombre_comercial": nombre_com,
+                                "nombre_tecnico": nombre_tec,
+                                "concentracion": concentracion_val,
+                                "formulacion": formulacion_val,
+                                "uso": uso_val
+                            }).eq("id_producto", prod_edit["id_producto"]).execute()
+                            
+                            st.session_state.producto_a_editar = None
+                            st.success("¡Producto actualizado!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al actualizar producto: {e}")
                     else:
                         st.error("Campos obligatorios (*).")
                         
@@ -1309,8 +1342,12 @@ with tab_productos:
         
         busqueda_prod = st.text_input("🔍 Buscar Producto", placeholder="Buscar por ID, nombre comercial o técnico...")
         
-        res_prod_all = supabase.table("productos").select("*").order("id_producto", desc=False).execute()
-        list_prods = res_prod_all.data if res_prod_all.data else []
+        try:
+            res_prod_all = supabase.table("productos").select("*").order("id_producto", desc=False).execute()
+            list_prods = res_prod_all.data if res_prod_all.data else []
+        except Exception as e:
+            st.error(f"Error al consultar productos: {e}")
+            list_prods = []
         
         if busqueda_prod:
             term_p = busqueda_prod.lower()

@@ -330,8 +330,7 @@ with col_user:
             cookie_manager.delete("solano_session", key="delete_solano_session")
         except Exception:
             pass
-        st.session_state.autenticado = False
-        st.session_state.usuario = None
+        st.session_state.clear()
         st.rerun()
 
 st.divider()

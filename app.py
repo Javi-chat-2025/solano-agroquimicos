@@ -96,27 +96,53 @@ def obtener_siguiente_num_factura():
 # ==========================================
 # GENERACIÓN DE SELLO DIGITAL Y QR
 # ==========================================
-def generar_sello_y_qr(num_factura, correo_usuario):
-    """Genera huella criptográfica SHA-256 e imagen QR en memoria."""
-    fecha_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    cadena_original = f"SOLANO|{num_factura}|{correo_usuario}|{fecha_hora}"
+def generar_sello_y_qr(num_factura, cliente_nombre, huerta_nombre, fecha, productos_detalle):
+    """Genera sello Hash SHA-256 e imagen QR con los datos legibles de la receta."""
+    fecha_hora_emision = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     
-    hash_obj = hashlib.sha256(cadena_original.encode('utf-8')).hexdigest()
-    sello_corto = hash_obj[:16].upper()
-    sello_formateado = "-".join([sello_corto[i:i+4] for i in range(0, 16, 4)])
+    # 1. Formatear la lista de productos
+    resumen_productos = []
+    if productos_detalle:
+        for prod in productos_detalle:
+            nombre = prod.get("nombre_comercial", "Producto")
+            dosis = prod.get("dosis", "")
+            unidad = prod.get("unidad", "")
+            resumen_productos.append(f"• {nombre}: {dosis} {unidad}")
     
-    url_validacion = f"{URL_BASE_APP}/?validar={sello_formateado}"
-    
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=6,
-        border=1,
+    lista_productos_txt = "\n".join(resumen_productos) if resumen_productos else "Sin productos registrados"
+
+    # 2. Construir el texto completo para el escaner
+    contenido_qr = (
+        f"✅ VERIFICACIÓN EXITOSA\n"
+        f"-------------------------------\n"
+        f"DOCUMENTO AUTÉNTICO\n"
+        f"SOLANO AGROQUÍMICOS\n"
+        f"-------------------------------\n"
+        f"Folio Receta: {num_factura}\n"
+        f"Fecha: {fecha}\n"
+        f"Cliente: {cliente_nombre}\n"
+        f"Huerta: {huerta_nombre}\n"
+        f"-------------------------------\n"
+        f"PRODUCTOS APLICADOS:\n"
+        f"{lista_productos_txt}"
     )
-    qr.add_data(url_validacion)
+
+    # 3. Hash / Sello Criptográfico
+    cadena_original = f"SOLANO|{num_factura}|{fecha}|{cliente_nombre}|{huerta_nombre}"
+    sello_hash = hashlib.sha256(cadena_original.encode('utf-8')).hexdigest()[:16].upper()
+    sello_formateado = "-".join([sello_hash[i:i+4] for i in range(0, 16, 4)])
+    
+    # 4. Generación de Imagen QR
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=8,
+        border=2,
+    )
+    qr.add_data(contenido_qr)
     qr.make(fit=True)
     
-    img_qr = qr.make_image(fill_color="#1b4332", back_color="white")
+    img_qr = qr.make_image(fill_color="black", back_color="white")
     
     qr_bytes = io.BytesIO()
     img_qr.save(qr_bytes, format='PNG')
@@ -124,9 +150,8 @@ def generar_sello_y_qr(num_factura, correo_usuario):
     
     return {
         "sello": sello_formateado,
-        "fecha_hora": fecha_hora,
-        "qr_bytes": qr_bytes,
-        "url": url_validacion
+        "fecha_hora": fecha_hora_emision,
+        "qr_bytes": qr_bytes
     }
 
 # ==========================================
@@ -526,8 +551,14 @@ def generar_pdf_estilo_solano(
     # ----------------------------------------------------
     # 6. SELLO DIGITAL Y QR (PIE DE PÁGINA FIJO)
     # ----------------------------------------------------
-    correo_usr = st.session_state.usuario.get("correo", "info@solano.com") if st.session_state.usuario else "info@solano.com"
-    datos_qr = generar_sello_y_qr(num_factura, correo_usr)
+    datos_qr = generar_sello_y_qr(
+        num_factura=num_factura,
+        cliente_nombre=cliente_nombre,
+        huerta_nombre=huerta_nombre,
+        fecha=fecha,
+        productos_detalle=productos_detalle
+    )
+    
     sello_texto = sello_digital if sello_digital else datos_qr["sello"]
     
     y_sello = 250
@@ -851,7 +882,13 @@ with tab_nueva_receta:
             with col_b2:
                 if st.button("💾 Guardar Receta y Generar PDF", type="primary"):
                     try:
-                        sello_info = generar_sello_y_qr(num_factura, st.session_state.usuario.get("correo"))
+                        sello_info = generar_sello_y_qr(
+                            num_factura=num_factura,
+                            cliente_nombre=cliente_nombre_val,
+                            huerta_nombre=huerta_info["nombre_huerta"],
+                            fecha=fecha_receta,
+                            productos_detalle=st.session_state.productos_receta_temp
+                        )
                         
                         res_receta = supabase.table("recetas").insert({
                             "id_huerta": huerta_info["id_huerta"],

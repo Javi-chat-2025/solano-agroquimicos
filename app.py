@@ -187,7 +187,10 @@ if "usuario" not in st.session_state:
 try:
     solano_cookie = cookie_manager.get(cookie="solano_session")
     if solano_cookie and not st.session_state.autenticado:
-        user_data = json.loads(solano_cookie) if isinstance(solano_cookie, str) else solano_cookie
+        if isinstance(solano_cookie, str):
+            user_data = json.loads(solano_cookie)
+        else:
+            user_data = solano_cookie
         st.session_state.autenticado = True
         st.session_state.usuario = user_data
 except Exception:
@@ -570,7 +573,9 @@ def generar_pdf_estilo_solano(
     pdf.set_draw_color(200, 210, 220)
     pdf.rect(10, y_sello, 190, 24, style='DF')
     
-    pdf.image(datos_qr["qr_bytes"], x=12, y=y_sello + 2, w=20, h=20)
+    # Inserción segura del QR en FPDF usando BytesIO
+    datos_qr["qr_bytes"].seek(0)
+    pdf.image(datos_qr["qr_bytes"], x=12, y=y_sello + 2, w=20, h=20, title="QR Code")
     
     pdf.set_xy(35, y_sello + 3)
     pdf.set_font("Helvetica", "B", 7.5)

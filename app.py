@@ -100,7 +100,6 @@ def generar_sello_y_qr(num_factura, cliente_nombre, huerta_nombre, fecha, produc
     """Genera sello Hash SHA-256 e imagen QR con los datos legibles de la receta."""
     fecha_hora_emision = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     
-    # 1. Formatear la lista de productos
     resumen_productos = []
     if productos_detalle:
         for prod in productos_detalle:
@@ -111,7 +110,6 @@ def generar_sello_y_qr(num_factura, cliente_nombre, huerta_nombre, fecha, produc
     
     lista_productos_txt = "\n".join(resumen_productos) if resumen_productos else "Sin productos registrados"
 
-    # 2. Construir el texto completo para el escaner
     contenido_qr = (
         f"✅ VERIFICACIÓN EXITOSA\n"
         f"-------------------------------\n"
@@ -127,12 +125,10 @@ def generar_sello_y_qr(num_factura, cliente_nombre, huerta_nombre, fecha, produc
         f"{lista_productos_txt}"
     )
 
-    # 3. Hash / Sello Criptográfico
     cadena_original = f"SOLANO|{num_factura}|{fecha}|{cliente_nombre}|{huerta_nombre}"
     sello_hash = hashlib.sha256(cadena_original.encode('utf-8')).hexdigest()[:16].upper()
     sello_formateado = "-".join([sello_hash[i:i+4] for i in range(0, 16, 4)])
     
-    # 4. Generación de Imagen QR
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -177,7 +173,7 @@ if "validar" in st.query_params:
                 st.success("✅ **DOCUMENTO AUTÉNTICO Y REGISTRADO**")
                 
                 with st.container(border=True):
-                    st.markdown(f"**N.° Factura / Folio:** #{receta.get('num_factura', 'N/A')}")
+                    st.markdown(f"**Folio Receta:** #{receta.get('id_receta', 'N/A')}")
                     st.markdown(f"**Fecha de Emisión:** {receta.get('fecha', 'N/A')}")
                     st.markdown(f"**Cliente:** {cliente_info.get('nombre', 'Cliente General')}")
                     st.markdown(f"**Huerta:** {huerta_info.get('nombre_huerta', 'N/A')}")
@@ -373,14 +369,13 @@ tab_perfiles, tab_nueva_receta, tab_visitas, tab_registro, tab_productos = st.ta
 ])
 
 # ==========================================
-# GENERADOR DE PDF (ESTRUCTURA Y COORDENADAS CORREGIDAS)
+# GENERADOR DE PDF (MODIFICADO SECTORES Y ENCABEZADOS)
 # ==========================================
 def generar_pdf_estilo_solano(
     empresa="SOLANO AGROQUÍMICOS",
     subtitulo="NUTRICIÓN ESPECIALIZADA",
     fecha=None,
     num_factura="0000001",
-    id_cliente="CLI-0001",
     cliente_nombre="Cliente General",
     huerta_nombre="Huerta General",
     huerta_ubicacion="Apatzingán, Michoacán",
@@ -403,7 +398,7 @@ def generar_pdf_estilo_solano(
     pdf.set_auto_page_break(auto=False)
     
     # ----------------------------------------------------
-    # 1. ENCABEZADO (LOGO Y DATOS DE EMPRESA / FACTURA)
+    # 1. ENCABEZADO (LOGO Y DATOS DE EMPRESA / FECHA)
     # ----------------------------------------------------
     if os.path.exists(logo_path):
         pdf.image(logo_path, x=10, y=8, w=22)
@@ -422,12 +417,10 @@ def generar_pdf_estilo_solano(
     pdf.set_font("Helvetica", "", 7.5)
     pdf.text(x_empresa, 22, subtitulo)
     
-    # Datos de Factura/Fecha (Derecha)
-    pdf.set_font("Helvetica", "B", 8)
+    # Fecha (Derecha)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.set_text_color(40, 40, 40)
-    pdf.text(138, 16, f"FECHA:           {fecha}")
-    pdf.text(138, 20, f"N.° FACTURA:   {num_factura}")
-    pdf.text(138, 24, f"ID. CLIENTE:   {id_cliente}")
+    pdf.text(145, 20, f"FECHA: {fecha}")
     
     # Línea divisora
     pdf.set_draw_color(210, 210, 210)
@@ -472,30 +465,26 @@ def generar_pdf_estilo_solano(
     pdf.ln(4)
     
     # ----------------------------------------------------
-    # 4. TABLA DE PRODUCTOS (ANCHOS CORREGIDOS - TOTAL 190mm)
+    # 4. TABLA DE PRODUCTOS (MODIFICADA SIN FORMULACIÓN Y NUEVOS NOMBRES)
     # ----------------------------------------------------
-    w_id = 14
-    w_com = 33
-    w_tec = 40
-    w_conc = 22
-    w_tipo = 28
-    w_func = 28
-    w_cant = 25
+    w_id = 16
+    w_com = 40
+    w_tec = 45  # Ingrediente Activo
+    w_conc = 25 # Concentración
+    w_func = 35 # Familia - Grupo
+    w_cant = 29 # Dosis
     
-    # Encabezados de tabla (Morado)
     pdf.set_fill_color(140, 30, 130)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 7)
     
     pdf.cell(w_id, 6, "Id Prod", fill=True, align="C")
     pdf.cell(w_com, 6, "Nombre Comercial", fill=True, align="C")
-    pdf.cell(w_tec, 6, "Nombre Técnico", fill=True, align="C")
+    pdf.cell(w_tec, 6, "Ingrediente Activo", fill=True, align="C")
     pdf.cell(w_conc, 6, "Concentración", fill=True, align="C")
-    pdf.cell(w_tipo, 6, "Formulación", fill=True, align="C")
-    pdf.cell(w_func, 6, "Uso", fill=True, align="C")
-    pdf.cell(w_cant, 6, f"Cant./{volumen_tanque}", fill=True, align="C", ln=True)
+    pdf.cell(w_func, 6, "Familia - Grupo", fill=True, align="C")
+    pdf.cell(w_cant, 6, "Dosis", fill=True, align="C", ln=True)
     
-    # Filas de productos
     pdf.set_font("Helvetica", "", 7)
     pdf.set_draw_color(220, 220, 220)
     
@@ -503,34 +492,24 @@ def generar_pdf_estilo_solano(
         pdf.set_text_color(40, 40, 40)
         
         y_pos = pdf.get_y()
-        row_h = 7.0  # Altura fija suficiente para 1-2 líneas
+        row_h = 7.0
         
-        # Columna 1: ID
         pdf.set_xy(10, y_pos)
         pdf.cell(w_id, row_h, str(prod.get("id_producto", "")), border="B", align="C")
         
-        # Columna 2: Nombre Comercial
         pdf.set_xy(10 + w_id, y_pos)
         pdf.cell(w_com, row_h, str(prod.get("nombre_comercial", "")), border="B", align="C")
         
-        # Columna 3: Nombre Técnico
         pdf.set_xy(10 + w_id + w_com, y_pos)
         pdf.cell(w_tec, row_h, str(prod.get("nombre_tecnico", "")), border="B", align="C")
         
-        # Columna 4: Concentración
         pdf.set_xy(10 + w_id + w_com + w_tec, y_pos)
         pdf.cell(w_conc, row_h, str(prod.get("concentracion", "")), border="B", align="C")
         
-        # Columna 5: Formulación
         pdf.set_xy(10 + w_id + w_com + w_tec + w_conc, y_pos)
-        pdf.cell(w_tipo, row_h, str(prod.get("formulacion", "")), border="B", align="C")
-        
-        # Columna 6: Uso
-        pdf.set_xy(10 + w_id + w_com + w_tec + w_conc + w_tipo, y_pos)
         pdf.cell(w_func, row_h, str(prod.get("uso", "")), border="B", align="C")
         
-        # Columna 7: Dosis/Cantidad (Resaltado Amarillo)
-        pdf.set_xy(10 + w_id + w_com + w_tec + w_conc + w_tipo + w_func, y_pos)
+        pdf.set_xy(10 + w_id + w_com + w_tec + w_conc + w_func, y_pos)
         pdf.set_fill_color(250, 235, 70)
         cant_str = f"{prod.get('dosis', '')} {prod.get('unidad', '')}"
         pdf.cell(w_cant, row_h, cant_str, border="B", fill=True, align="C")
@@ -538,7 +517,7 @@ def generar_pdf_estilo_solano(
         pdf.set_y(y_pos + row_h)
 
     # ----------------------------------------------------
-    # 5. FIRMA DEL ASESOR TÉCNICO (POSICIÓN POSICIONADA)
+    # 5. FIRMA DEL ASESOR TÉCNICO
     # ----------------------------------------------------
     pdf.set_y(230)
     pdf.set_font("Helvetica", "B", 8)
@@ -549,7 +528,7 @@ def generar_pdf_estilo_solano(
     pdf.cell(190, 3, asesor_rfc, align="C", ln=True)
     
     # ----------------------------------------------------
-    # 6. SELLO DIGITAL Y QR (PIE DE PÁGINA FIJO)
+    # 6. SELLO DIGITAL Y QR
     # ----------------------------------------------------
     datos_qr = generar_sello_y_qr(
         num_factura=num_factura,
@@ -567,11 +546,9 @@ def generar_pdf_estilo_solano(
     pdf.set_draw_color(200, 210, 220)
     pdf.rect(10, y_sello, 190, 24, style='DF')
     
-    # Insertar QR
     datos_qr["qr_bytes"].seek(0)
     pdf.image(datos_qr["qr_bytes"], x=12, y=y_sello + 2, w=20, h=20, title="QR Code")
     
-    # Detalles del sello digital
     pdf.set_xy(35, y_sello + 2.5)
     pdf.set_font("Helvetica", "B", 7.5)
     pdf.set_text_color(27, 67, 50)
@@ -687,14 +664,14 @@ with tab_perfiles:
                 st.rerun()
         with col_info:
             st.subheader("📜 Recetas Emitidas")
-            st.write(f"👤 **Cliente:** {cliente['nombre']} (ID: `{formatear_id_cliente(cliente.get('id_cliente'))}`) | 🌳 **Huerta:** {huerta['nombre_huerta']} ({huerta.get('ubicacion') or 'N/A'})")
+            st.write(f"👤 **Cliente:** {cliente['nombre']} | 🌳 **Huerta:** {huerta['nombre_huerta']} ({huerta.get('ubicacion') or 'N/A'})")
 
         st.write("---")
         
         try:
             res_recetas = supabase.table("recetas").select(
                 "id_receta, fecha, num_factura, objetivo, volumen_tanque, sello_digital, "
-                "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, concentracion, formulacion, uso))"
+                "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, concentracion, uso))"
             ).eq("id_huerta", huerta["id_huerta"]).order("id_receta", desc=True).execute()
             recetas = res_recetas.data if res_recetas.data else []
         except Exception as e:
@@ -713,7 +690,7 @@ with tab_perfiles:
                     
                     with col_detalles:
                         st.markdown(f"### 📄 Receta #{r['id_receta']} — Fecha: `{r.get('fecha', 'N/A')}`")
-                        st.write(f"**N.° Factura:** `{r.get('num_factura', 'N/A')}` | **Volumen:** {r.get('volumen_tanque', 'N/A')}")
+                        st.write(f"**Volumen:** {r.get('volumen_tanque', 'N/A')}")
                         st.write(f"🎯 **Objetivo:** {r.get('objetivo', 'N/A')}")
                         if r.get("sello_digital"):
                             st.caption(f"🛡️ **Sello Digital:** `{r.get('sello_digital')}`")
@@ -726,7 +703,6 @@ with tab_perfiles:
                                 "nombre_comercial": p.get("nombre_comercial", ""),
                                 "nombre_tecnico": p.get("nombre_tecnico", ""),
                                 "concentracion": p.get("concentracion", ""),
-                                "formulacion": p.get("formulacion", ""),
                                 "uso": p.get("uso", ""),
                                 "dosis": d.get("dosis", ""),
                                 "unidad": d.get("unidad", "")
@@ -740,13 +716,11 @@ with tab_perfiles:
                     with col_pdf:
                         st.write("")
                         st.write("")
-                        id_cli_str = formatear_id_cliente(cliente.get("id_cliente"))
                         pdf_bytes = generar_pdf_estilo_solano(
                             empresa="SOLANO AGROQUÍMICOS",
                             subtitulo="NUTRICIÓN ESPECIALIZADA",
                             fecha=r.get("fecha") or obtener_fecha_actual(),
                             num_factura=r.get("num_factura", ""),
-                            id_cliente=id_cli_str,
                             cliente_nombre=cliente.get("nombre", "Cliente General"),
                             huerta_nombre=huerta.get("nombre_huerta", "Huerta General"),
                             huerta_ubicacion=huerta.get("ubicacion", "N/A"),
@@ -795,18 +769,15 @@ with tab_nueva_receta:
             
             cliente_info = huerta_info.get("clientes") or {}
             cliente_nombre_val = cliente_info.get("nombre", "Cliente General")
-            id_cliente_raw = huerta_info.get("id_cliente") or cliente_info.get("id_cliente")
-            id_cliente_formateado = formatear_id_cliente(id_cliente_raw)
             
             st.info(
-                f"👤 **Cliente:** {cliente_nombre_val} (ID: `{id_cliente_formateado}`)\n\n"
+                f"👤 **Cliente:** {cliente_nombre_val}\n\n"
                 f"🌳 **Huerta:** {huerta_info.get('nombre_huerta', 'N/A')}\n\n"
                 f"📍 **Ubicación:** {huerta_info.get('ubicacion') or 'Sin ubicación'}"
             )
             
             fecha_receta = st.text_input("Fecha (Día/Mes/Año)", value=obtener_fecha_actual(), disabled=True)
             num_factura_autoincrementado = obtener_siguiente_num_factura()
-            num_factura = st.text_input("N.° Factura", value=num_factura_autoincrementado, disabled=True)
             volumen_tanque = st.text_input("Volumen del Tanque", value="2000 litros")
             objetivo_aplicacion = st.text_input("Objetivo de la Aplicación", value="Aplicación para defoliadores + control de hongos")
             
@@ -827,7 +798,6 @@ with tab_nueva_receta:
                     "nombre_comercial": prod_info["nombre_comercial"],
                     "nombre_tecnico": prod_info.get("nombre_tecnico", ""),
                     "concentracion": prod_info.get("concentracion", ""),
-                    "formulacion": prod_info.get("formulacion", ""),
                     "uso": prod_info.get("uso", ""),
                     "dosis": dosis_val,
                     "unidad": unidad_val
@@ -835,36 +805,33 @@ with tab_nueva_receta:
                 st.success(f"Añadido: [{prod_info['id_producto']}] {prod_info['nombre_comercial']}")
                 st.rerun()
 
-        # TABLA TEMPORAL
         if st.session_state.productos_receta_temp:
             st.write("---")
             st.markdown("### 📋 Resumen de Productos de la Receta")
             
-            col_h_id, col_h_com, col_h_tec, col_h_conc, col_h_tipo, col_h_func, col_h_cant, col_h_del = st.columns(
-                [1.0, 2.0, 2.0, 1.5, 1.3, 1.8, 1.8, 0.7]
+            col_h_id, col_h_com, col_h_tec, col_h_conc, col_h_func, col_h_cant, col_h_del = st.columns(
+                [1.0, 2.0, 2.0, 1.5, 1.8, 1.8, 0.7]
             )
             
             with col_h_id: st.markdown("**ID**")
             with col_h_com: st.markdown("**Nombre Comercial**")
-            with col_h_tec: st.markdown("**Nombre Técnico**")
+            with col_h_tec: st.markdown("**Ingrediente Activo**")
             with col_h_conc: st.markdown("**Concentración**")
-            with col_h_tipo: st.markdown("**Formulación**")
-            with col_h_func: st.markdown("**Uso**")
-            with col_h_cant: st.markdown(f"**Cant / {volumen_tanque}**")
+            with col_h_func: st.markdown("**Familia - Grupo**")
+            with col_h_cant: st.markdown("**Dosis**")
             with col_h_del: st.markdown("**Acción**")
             
             st.divider()
 
             for idx, item in enumerate(st.session_state.productos_receta_temp):
-                c_id, c_com, c_tec, c_conc, c_tipo, c_func, c_cant, c_del = st.columns(
-                    [1.0, 2.0, 2.0, 1.5, 1.3, 1.8, 1.8, 0.7]
+                c_id, c_com, c_tec, c_conc, c_func, c_cant, c_del = st.columns(
+                    [1.0, 2.0, 2.0, 1.5, 1.8, 1.8, 0.7]
                 )
                 
                 with c_id: st.write(f"`{item['id_producto']}`")
                 with c_com: st.write(item["nombre_comercial"])
                 with c_tec: st.write(item.get("nombre_tecnico") or "-")
                 with c_conc: st.write(item.get("concentracion") or "-")
-                with c_tipo: st.write(item.get("formulacion") or "-")
                 with c_func: st.write(item.get("uso") or "-")
                 with c_cant: st.write(f"{item['dosis']} {item['unidad']}")
                 with c_del:
@@ -883,7 +850,7 @@ with tab_nueva_receta:
                 if st.button("💾 Guardar Receta y Generar PDF", type="primary"):
                     try:
                         sello_info = generar_sello_y_qr(
-                            num_factura=num_factura,
+                            num_factura=num_factura_autoincrementado,
                             cliente_nombre=cliente_nombre_val,
                             huerta_nombre=huerta_info["nombre_huerta"],
                             fecha=fecha_receta,
@@ -893,7 +860,7 @@ with tab_nueva_receta:
                         res_receta = supabase.table("recetas").insert({
                             "id_huerta": huerta_info["id_huerta"],
                             "fecha": fecha_receta,
-                            "num_factura": num_factura,
+                            "num_factura": num_factura_autoincrementado,
                             "objetivo": objetivo_aplicacion,
                             "volumen_tanque": volumen_tanque,
                             "sello_digital": sello_info["sello"]
@@ -915,8 +882,7 @@ with tab_nueva_receta:
                                 empresa="SOLANO AGROQUÍMICOS",
                                 subtitulo="NUTRICIÓN ESPECIALIZADA",
                                 fecha=fecha_receta,
-                                num_factura=num_factura,
-                                id_cliente=id_cliente_formateado,
+                                num_factura=num_factura_autoincrementado,
                                 cliente_nombre=cliente_nombre_val,
                                 huerta_nombre=huerta_info["nombre_huerta"],
                                 huerta_ubicacion=huerta_info.get("ubicacion", "N/A"),
@@ -928,7 +894,7 @@ with tab_nueva_receta:
                             )
                             
                             st.session_state.productos_receta_temp = []
-                            st.success(f"¡Receta #{id_receta_creada} guardada con éxito (Factura: #{num_factura})!")
+                            st.success(f"¡Receta #{id_receta_creada} guardada con éxito!")
                             
                             st.download_button(
                                 label="📄 Descargar PDF Con QR y Sello Digital",
@@ -1269,15 +1235,12 @@ with tab_registro:
 with tab_productos:
     st.subheader("🧪 Catálogo de Productos Agroquímicos")
     
-    # --------------------------------------
-    # MÓDULO DE IMPORTACIÓN MASIVA DESDE EXCEL
-    # --------------------------------------
     with st.expander("📥 Importar o Actualizar Productos mediante Excel / CSV", expanded=False):
         col_ex1, col_ex2 = st.columns([2, 1])
         
         with col_ex1:
             st.markdown("##### Subir archivo de Excel")
-            st.caption("Asegúrate de que las columnas del Excel se llamen exactamente así: `id_producto`, `nombre_comercial`, `nombre_tecnico`, `concentracion`, `formulacion`, `uso`.")
+            st.caption("Asegúrate de que las columnas del Excel se llamen exactamente así: `id_producto`, `nombre_comercial`, `nombre_tecnico`, `concentracion`, `uso`.")
             
             archivo_excel = st.file_uploader("Selecciona tu archivo (.xlsx o .csv)", type=["xlsx", "xls", "csv"])
             
@@ -1318,16 +1281,14 @@ with tab_productos:
                     "nombre_comercial": "Amistar Extra",
                     "nombre_tecnico": "Azoxistrobin + Ciproconazol",
                     "concentracion": "200 g/L",
-                    "formulacion": "Suspensión Concentrada (SC)",
-                    "uso": "Fungicida de amplio espectro"
+                    "uso": "Estrobilurinas + Triazoles"
                 },
                 {
                     "id_producto": "PROD-002",
                     "nombre_comercial": "Akron 300",
                     "nombre_tecnico": "Chlorpyrifos",
                     "concentracion": "480 g/L",
-                    "formulacion": "Concentrado Emulsionable (EC)",
-                    "uso": "Insecticida organofosforado"
+                    "uso": "Organofosforados"
                 }
             ])
             
@@ -1346,9 +1307,6 @@ with tab_productos:
 
     st.write("---")
 
-    # --------------------------------------
-    # FORMULARIO MANUAL Y TABLA EXISTENTE
-    # --------------------------------------
     col_f_prod, col_t_prod = st.columns([1.2, 2.8])
     
     with col_f_prod:
@@ -1359,10 +1317,9 @@ with tab_productos:
             with st.form("form_edit_producto"):
                 id_prod_val = st.text_input("ID / Código Producto *", value=prod_edit.get("id_producto", ""), disabled=True)
                 nombre_com = st.text_input("Nombre Comercial *", value=prod_edit.get("nombre_comercial", ""))
-                nombre_tec = st.text_input("Nombre Técnico / Ingrediente Activo", value=prod_edit.get("nombre_tecnico", "") or "")
+                nombre_tec = st.text_input("Ingrediente Activo", value=prod_edit.get("nombre_tecnico", "") or "")
                 concentracion_val = st.text_input("Concentración", value=prod_edit.get("concentracion", "") or "")
-                formulacion_val = st.text_input("Formulación", value=prod_edit.get("formulacion", "") or "")
-                uso_val = st.text_input("Uso Recomendado", value=prod_edit.get("uso", "") or "")
+                uso_val = st.text_input("Familia - Grupo", value=prod_edit.get("uso", "") or "")
                 
                 c1, c2 = st.columns(2)
                 with c1:
@@ -1377,7 +1334,6 @@ with tab_productos:
                                 "nombre_comercial": nombre_com,
                                 "nombre_tecnico": nombre_tec,
                                 "concentracion": concentracion_val,
-                                "formulacion": formulacion_val,
                                 "uso": uso_val
                             }).eq("id_producto", prod_edit["id_producto"]).execute()
                             
@@ -1397,10 +1353,9 @@ with tab_productos:
             with st.form("form_nuevo_producto"):
                 id_prod_val = st.text_input("ID / Código Producto *", placeholder="Ej. PROD-001")
                 nombre_com = st.text_input("Nombre Comercial *", placeholder="Ej. Amistar Extra")
-                nombre_tec = st.text_input("Nombre Técnico / Ingrediente Activo", placeholder="Ej. Azoxistrobin + Ciproconazol")
+                nombre_tec = st.text_input("Ingrediente Activo", placeholder="Ej. Azoxistrobin + Ciproconazol")
                 concentracion_val = st.text_input("Concentración", placeholder="Ej. 200 g/L")
-                formulacion_val = st.text_input("Formulación", placeholder="Ej. Suspensión Concentrada (SC)")
-                uso_val = st.text_input("Uso Recomendado", placeholder="Ej. Fungicida de amplio espectro")
+                uso_val = st.text_input("Familia - Grupo", placeholder="Ej. Estrobilurinas + Triazoles")
                 
                 guardar_prod = st.form_submit_button("💾 Registrar Producto", type="primary")
                 
@@ -1412,7 +1367,6 @@ with tab_productos:
                                 "nombre_comercial": nombre_com,
                                 "nombre_tecnico": nombre_tec,
                                 "concentracion": concentracion_val,
-                                "formulacion": formulacion_val,
                                 "uso": uso_val
                             }).execute()
                             st.success(f"Producto '[{id_prod_val}] {nombre_com}' registrado.")
@@ -1425,7 +1379,7 @@ with tab_productos:
     with col_t_prod:
         st.markdown("### 📋 Productos en Catálogo")
         
-        busqueda_prod = st.text_input("🔍 Buscar Producto", placeholder="Buscar por ID, nombre comercial o técnico...")
+        busqueda_prod = st.text_input("🔍 Buscar Producto", placeholder="Buscar por ID, nombre comercial o ingrediente activo...")
         
         try:
             res_prod_all = supabase.table("productos").select("*").order("id_producto", desc=False).execute()
@@ -1452,8 +1406,8 @@ with tab_productos:
                     c1, c2, c3 = st.columns([3, 1, 1])
                     with c1:
                         st.markdown(f"**[{p['id_producto']}] {p['nombre_comercial']}**")
-                        st.caption(f"🧪 Técnico: {p.get('nombre_tecnico') or 'N/A'} | Conc: {p.get('concentracion') or 'N/A'} | Form: {p.get('formulacion') or 'N/A'}")
-                        st.write(f"🎯 **Uso:** {p.get('uso') or 'N/A'}")
+                        st.caption(f"🧪 Ingrediente Activo: {p.get('nombre_tecnico') or 'N/A'} | Conc: {p.get('concentracion') or 'N/A'}")
+                        st.write(f"🧬 **Familia - Grupo:** {p.get('uso') or 'N/A'}")
                     with c2:
                         if st.button("✏️ Editar", key=f"edit_prod_{p['id_producto']}"):
                             st.session_state.producto_a_editar = p

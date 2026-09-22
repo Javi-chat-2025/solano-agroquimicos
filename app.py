@@ -369,7 +369,7 @@ tab_perfiles, tab_nueva_receta, tab_visitas, tab_registro, tab_productos = st.ta
 ])
 
 # ==========================================
-# GENERADOR DE PDF (MODIFICADO SECTORES Y ENCABEZADOS)
+# GENERADOR DE PDF
 # ==========================================
 def generar_pdf_estilo_solano(
     empresa="SOLANO AGROQUÍMICOS",
@@ -465,23 +465,21 @@ def generar_pdf_estilo_solano(
     pdf.ln(4)
     
     # ----------------------------------------------------
-    # 4. TABLA DE PRODUCTOS (MODIFICADA SIN FORMULACIÓN Y NUEVOS NOMBRES)
+    # 4. TABLA DE PRODUCTOS (SIN CONCENTRACIÓN)
     # ----------------------------------------------------
-    w_id = 16
-    w_com = 40
-    w_tec = 45  # Ingrediente Activo
-    w_conc = 25 # Concentración
+    w_id = 20
+    w_com = 50
+    w_tec = 55  # Ingrediente Activo
     w_func = 35 # Familia - Grupo
-    w_cant = 29 # Dosis
+    w_cant = 30 # Dosis
     
     pdf.set_fill_color(140, 30, 130)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 7)
+    pdf.set_font("Helvetica", "B", 7.5)
     
     pdf.cell(w_id, 6, "Id Prod", fill=True, align="C")
     pdf.cell(w_com, 6, "Nombre Comercial", fill=True, align="C")
     pdf.cell(w_tec, 6, "Ingrediente Activo", fill=True, align="C")
-    pdf.cell(w_conc, 6, "Concentración", fill=True, align="C")
     pdf.cell(w_func, 6, "Familia - Grupo", fill=True, align="C")
     pdf.cell(w_cant, 6, "Dosis", fill=True, align="C", ln=True)
     
@@ -504,12 +502,9 @@ def generar_pdf_estilo_solano(
         pdf.cell(w_tec, row_h, str(prod.get("nombre_tecnico", "")), border="B", align="C")
         
         pdf.set_xy(10 + w_id + w_com + w_tec, y_pos)
-        pdf.cell(w_conc, row_h, str(prod.get("concentracion", "")), border="B", align="C")
-        
-        pdf.set_xy(10 + w_id + w_com + w_tec + w_conc, y_pos)
         pdf.cell(w_func, row_h, str(prod.get("uso", "")), border="B", align="C")
         
-        pdf.set_xy(10 + w_id + w_com + w_tec + w_conc + w_func, y_pos)
+        pdf.set_xy(10 + w_id + w_com + w_tec + w_func, y_pos)
         pdf.set_fill_color(250, 235, 70)
         cant_str = f"{prod.get('dosis', '')} {prod.get('unidad', '')}"
         pdf.cell(w_cant, row_h, cant_str, border="B", fill=True, align="C")
@@ -671,7 +666,7 @@ with tab_perfiles:
         try:
             res_recetas = supabase.table("recetas").select(
                 "id_receta, fecha, num_factura, objetivo, volumen_tanque, sello_digital, "
-                "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, concentracion, uso))"
+                "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, uso))"
             ).eq("id_huerta", huerta["id_huerta"]).order("id_receta", desc=True).execute()
             recetas = res_recetas.data if res_recetas.data else []
         except Exception as e:
@@ -702,7 +697,6 @@ with tab_perfiles:
                                 "id_producto": p.get("id_producto", ""),
                                 "nombre_comercial": p.get("nombre_comercial", ""),
                                 "nombre_tecnico": p.get("nombre_tecnico", ""),
-                                "concentracion": p.get("concentracion", ""),
                                 "uso": p.get("uso", ""),
                                 "dosis": d.get("dosis", ""),
                                 "unidad": d.get("unidad", "")
@@ -797,7 +791,6 @@ with tab_nueva_receta:
                     "id_producto": prod_info["id_producto"],
                     "nombre_comercial": prod_info["nombre_comercial"],
                     "nombre_tecnico": prod_info.get("nombre_tecnico", ""),
-                    "concentracion": prod_info.get("concentracion", ""),
                     "uso": prod_info.get("uso", ""),
                     "dosis": dosis_val,
                     "unidad": unidad_val
@@ -809,14 +802,13 @@ with tab_nueva_receta:
             st.write("---")
             st.markdown("### 📋 Resumen de Productos de la Receta")
             
-            col_h_id, col_h_com, col_h_tec, col_h_conc, col_h_func, col_h_cant, col_h_del = st.columns(
-                [1.0, 2.0, 2.0, 1.5, 1.8, 1.8, 0.7]
+            col_h_id, col_h_com, col_h_tec, col_h_func, col_h_cant, col_h_del = st.columns(
+                [1.0, 2.5, 2.5, 2.0, 1.8, 0.7]
             )
             
             with col_h_id: st.markdown("**ID**")
             with col_h_com: st.markdown("**Nombre Comercial**")
             with col_h_tec: st.markdown("**Ingrediente Activo**")
-            with col_h_conc: st.markdown("**Concentración**")
             with col_h_func: st.markdown("**Familia - Grupo**")
             with col_h_cant: st.markdown("**Dosis**")
             with col_h_del: st.markdown("**Acción**")
@@ -824,14 +816,13 @@ with tab_nueva_receta:
             st.divider()
 
             for idx, item in enumerate(st.session_state.productos_receta_temp):
-                c_id, c_com, c_tec, c_conc, c_func, c_cant, c_del = st.columns(
-                    [1.0, 2.0, 2.0, 1.5, 1.8, 1.8, 0.7]
+                c_id, c_com, c_tec, c_func, c_cant, c_del = st.columns(
+                    [1.0, 2.5, 2.5, 2.0, 1.8, 0.7]
                 )
                 
                 with c_id: st.write(f"`{item['id_producto']}`")
                 with c_com: st.write(item["nombre_comercial"])
                 with c_tec: st.write(item.get("nombre_tecnico") or "-")
-                with c_conc: st.write(item.get("concentracion") or "-")
                 with c_func: st.write(item.get("uso") or "-")
                 with c_cant: st.write(f"{item['dosis']} {item['unidad']}")
                 with c_del:
@@ -1240,7 +1231,7 @@ with tab_productos:
         
         with col_ex1:
             st.markdown("##### Subir archivo de Excel")
-            st.caption("Asegúrate de que las columnas del Excel se llamen exactamente así: `id_producto`, `nombre_comercial`, `nombre_tecnico`, `concentracion`, `uso`.")
+            st.caption("Asegúrate de que las columnas del Excel se llamen exactamente así: `id_producto`, `nombre_comercial`, `nombre_tecnico`, `uso`.")
             
             archivo_excel = st.file_uploader("Selecciona tu archivo (.xlsx o .csv)", type=["xlsx", "xls", "csv"])
             
@@ -1279,15 +1270,13 @@ with tab_productos:
                 {
                     "id_producto": "PROD-001",
                     "nombre_comercial": "Amistar Extra",
-                    "nombre_tecnico": "Azoxistrobin + Ciproconazol",
-                    "concentracion": "200 g/L",
+                    "nombre_tecnico": "Azoxistrobin + Ciproconazol (200 g/L)",
                     "uso": "Estrobilurinas + Triazoles"
                 },
                 {
                     "id_producto": "PROD-002",
                     "nombre_comercial": "Akron 300",
-                    "nombre_tecnico": "Chlorpyrifos",
-                    "concentracion": "480 g/L",
+                    "nombre_tecnico": "Chlorpyrifos (480 g/L)",
                     "uso": "Organofosforados"
                 }
             ])
@@ -1317,8 +1306,7 @@ with tab_productos:
             with st.form("form_edit_producto"):
                 id_prod_val = st.text_input("ID / Código Producto *", value=prod_edit.get("id_producto", ""), disabled=True)
                 nombre_com = st.text_input("Nombre Comercial *", value=prod_edit.get("nombre_comercial", ""))
-                nombre_tec = st.text_input("Ingrediente Activo", value=prod_edit.get("nombre_tecnico", "") or "")
-                concentracion_val = st.text_input("Concentración", value=prod_edit.get("concentracion", "") or "")
+                nombre_tec = st.text_input("Ingrediente Activo (con concentración)", value=prod_edit.get("nombre_tecnico", "") or "")
                 uso_val = st.text_input("Familia - Grupo", value=prod_edit.get("uso", "") or "")
                 
                 c1, c2 = st.columns(2)
@@ -1333,7 +1321,6 @@ with tab_productos:
                             supabase.table("productos").update({
                                 "nombre_comercial": nombre_com,
                                 "nombre_tecnico": nombre_tec,
-                                "concentracion": concentracion_val,
                                 "uso": uso_val
                             }).eq("id_producto", prod_edit["id_producto"]).execute()
                             
@@ -1353,8 +1340,7 @@ with tab_productos:
             with st.form("form_nuevo_producto"):
                 id_prod_val = st.text_input("ID / Código Producto *", placeholder="Ej. PROD-001")
                 nombre_com = st.text_input("Nombre Comercial *", placeholder="Ej. Amistar Extra")
-                nombre_tec = st.text_input("Ingrediente Activo", placeholder="Ej. Azoxistrobin + Ciproconazol")
-                concentracion_val = st.text_input("Concentración", placeholder="Ej. 200 g/L")
+                nombre_tec = st.text_input("Ingrediente Activo (con concentración)", placeholder="Ej. Azoxistrobin + Ciproconazol (200 g/L)")
                 uso_val = st.text_input("Familia - Grupo", placeholder="Ej. Estrobilurinas + Triazoles")
                 
                 guardar_prod = st.form_submit_button("💾 Registrar Producto", type="primary")
@@ -1366,7 +1352,6 @@ with tab_productos:
                                 "id_producto": id_prod_val,
                                 "nombre_comercial": nombre_com,
                                 "nombre_tecnico": nombre_tec,
-                                "concentracion": concentracion_val,
                                 "uso": uso_val
                             }).execute()
                             st.success(f"Producto '[{id_prod_val}] {nombre_com}' registrado.")
@@ -1406,7 +1391,7 @@ with tab_productos:
                     c1, c2, c3 = st.columns([3, 1, 1])
                     with c1:
                         st.markdown(f"**[{p['id_producto']}] {p['nombre_comercial']}**")
-                        st.caption(f"🧪 Ingrediente Activo: {p.get('nombre_tecnico') or 'N/A'} | Conc: {p.get('concentracion') or 'N/A'}")
+                        st.caption(f"🧪 Ingrediente Activo: {p.get('nombre_tecnico') or 'N/A'}")
                         st.write(f"🧬 **Familia - Grupo:** {p.get('uso') or 'N/A'}")
                     with c2:
                         if st.button("✏️ Editar", key=f"edit_prod_{p['id_producto']}"):

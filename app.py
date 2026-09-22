@@ -1231,7 +1231,10 @@ with tab_productos:
         
         with col_ex1:
             st.markdown("##### Subir archivo de Excel")
-            st.caption("Asegúrate de que las columnas del Excel se llamen exactamente así: `id_producto`, `nombre_comercial`, `nombre_tecnico`, `uso`.")
+            st.caption(
+                "Asegúrate de que las columnas del Excel se llamen preferentemente así:\n"
+                "`id_producto`, `nombre_comercial`, `Ingrediente Activo (con concentración)`, `Familia - Grupo`."
+            )
             
             archivo_excel = st.file_uploader("Selecciona tu archivo (.xlsx o .csv)", type=["xlsx", "xls", "csv"])
             
@@ -1241,6 +1244,16 @@ with tab_productos:
                         df_import = pd.read_csv(archivo_excel)
                     else:
                         df_import = pd.read_excel(archivo_excel)
+                    
+                    # Mapeo flexible para renombrar las columnas del Excel hacia las columnas de Supabase
+                    mapa_columnas = {
+                        "Ingrediente Activo (con concentración)": "nombre_tecnico",
+                        "Ingrediente Activo": "nombre_tecnico",
+                        "Familia - Grupo": "uso",
+                        "Familia": "uso",
+                        "Grupo": "uso"
+                    }
+                    df_import = df_import.rename(columns=mapa_columnas)
                     
                     st.write("🔍 **Vista previa de los datos a importar:**")
                     st.dataframe(df_import.head(5), use_container_width=True)
@@ -1252,8 +1265,12 @@ with tab_productos:
                         st.error(f"❌ Al archivo le faltan columnas obligatorias: {cols_requeridas - cols_presentes}")
                     else:
                         if st.button("🚀 Cargar Productos a la Base de Datos", type="primary"):
-                            df_import = df_import.fillna("")
-                            registros = df_import.to_dict(orient="records")
+                            # Filtrar solo las columnas existentes en la tabla 'productos'
+                            cols_permitidas = ["id_producto", "nombre_comercial", "nombre_tecnico", "uso"]
+                            cols_validas = [col for col in cols_permitidas if col in df_import.columns]
+                            
+                            df_final = df_import[cols_validas].fillna("")
+                            registros = df_final.to_dict(orient="records")
                             
                             supabase.table("productos").upsert(registros).execute()
                             st.success(f"✅ ¡Se han importado/actualizado {len(registros)} productos con éxito!")
@@ -1264,20 +1281,20 @@ with tab_productos:
                     
         with col_ex2:
             st.markdown("##### Descargar Plantilla")
-            st.caption("Usa esta plantilla base para rellenar tus productos en Excel:")
+            st.caption("Usa esta plantilla base para rellenar tus productos en Excel con los encabezados exactos:")
             
             df_plantilla = pd.DataFrame([
                 {
                     "id_producto": "PROD-001",
                     "nombre_comercial": "Amistar Extra",
-                    "nombre_tecnico": "Azoxistrobin + Ciproconazol (200 g/L)",
-                    "uso": "Estrobilurinas + Triazoles"
+                    "Ingrediente Activo (con concentración)": "Azoxistrobin + Ciproconazol (200 g/L)",
+                    "Familia - Grupo": "Estrobilurinas + Triazoles"
                 },
                 {
                     "id_producto": "PROD-002",
                     "nombre_comercial": "Akron 300",
-                    "nombre_tecnico": "Chlorpyrifos (480 g/L)",
-                    "uso": "Organofosforados"
+                    "Ingrediente Activo (con concentración)": "Chlorpyrifos (480 g/L)",
+                    "Familia - Grupo": "Organofosforados"
                 }
             ])
             

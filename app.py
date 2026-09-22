@@ -465,13 +465,13 @@ def generar_pdf_estilo_solano(
     pdf.ln(4)
     
     # ----------------------------------------------------
-    # 4. TABLA DE PRODUCTOS (SIN CONCENTRACIÓN)
+    # 4. TABLA DE PRODUCTOS (CON MULTI-LÍNEA DINÁMICA)
     # ----------------------------------------------------
     w_id = 20
-    w_com = 50
-    w_tec = 55  # Ingrediente Activo
+    w_com = 45
+    w_tec = 65  # Ampliado para Ingrediente Activo
     w_func = 35 # Familia - Grupo
-    w_cant = 30 # Dosis
+    w_cant = 25 # Dosis
     
     pdf.set_fill_color(140, 30, 130)
     pdf.set_text_color(255, 255, 255)
@@ -486,29 +486,58 @@ def generar_pdf_estilo_solano(
     pdf.set_font("Helvetica", "", 7)
     pdf.set_draw_color(220, 220, 220)
     
+    h_linea = 4.0  # Altura por cada línea individual de texto
+    
     for prod in productos_detalle:
         pdf.set_text_color(40, 40, 40)
         
+        str_id = str(prod.get("id_producto", ""))
+        str_com = str(prod.get("nombre_comercial", ""))
+        str_tec = str(prod.get("nombre_tecnico", ""))
+        str_func = str(prod.get("uso", ""))
+        str_cant = f"{prod.get('dosis', '')} {prod.get('unidad', '')}"
+        
+        # Calcular cuantas líneas tomará el texto más largo en este renglón
+        num_lineas_com = len(pdf.multi_cell(w_com, h_linea, str_com, dry_run=True, output="LINES"))
+        num_lineas_tec = len(pdf.multi_cell(w_tec, h_linea, str_tec, dry_run=True, output="LINES"))
+        num_lineas_func = len(pdf.multi_cell(w_func, h_linea, str_func, dry_run=True, output="LINES"))
+        
+        max_lineas = max(1, num_lineas_com, num_lineas_tec, num_lineas_func)
+        row_h = max_lineas * h_linea + 2  # Altura total adaptativa con margen interno
+        
         y_pos = pdf.get_y()
-        row_h = 7.0
         
-        pdf.set_xy(10, y_pos)
-        pdf.cell(w_id, row_h, str(prod.get("id_producto", "")), border="B", align="C")
+        # Dibujar rectángulos de fondo/borde para mantener la estructura uniforme
+        pdf.rect(10, y_pos, w_id, row_h)
+        pdf.rect(10 + w_id, y_pos, w_com, row_h)
+        pdf.rect(10 + w_id + w_com, y_pos, w_tec, row_h)
+        pdf.rect(10 + w_id + w_com + w_tec, y_pos, w_func, row_h)
         
-        pdf.set_xy(10 + w_id, y_pos)
-        pdf.cell(w_com, row_h, str(prod.get("nombre_comercial", "")), border="B", align="C")
-        
-        pdf.set_xy(10 + w_id + w_com, y_pos)
-        pdf.cell(w_tec, row_h, str(prod.get("nombre_tecnico", "")), border="B", align="C")
-        
-        pdf.set_xy(10 + w_id + w_com + w_tec, y_pos)
-        pdf.cell(w_func, row_h, str(prod.get("uso", "")), border="B", align="C")
-        
-        pdf.set_xy(10 + w_id + w_com + w_tec + w_func, y_pos)
+        # Resaltado amarillo para la dosis
         pdf.set_fill_color(250, 235, 70)
-        cant_str = f"{prod.get('dosis', '')} {prod.get('unidad', '')}"
-        pdf.cell(w_cant, row_h, cant_str, border="B", fill=True, align="C")
+        pdf.rect(10 + w_id + w_com + w_tec + w_func, y_pos, w_cant, row_h, style='DF')
         
+        # Imprimir ID
+        pdf.set_xy(10, y_pos + (row_h - h_linea)/2)
+        pdf.multi_cell(w_id, h_linea, str_id, border=0, align="C")
+        
+        # Imprimir Nombre Comercial
+        pdf.set_xy(10 + w_id, y_pos + 1)
+        pdf.multi_cell(w_com, h_linea, str_com, border=0, align="C")
+        
+        # Imprimir Ingrediente Activo
+        pdf.set_xy(10 + w_id + w_com, y_pos + 1)
+        pdf.multi_cell(w_tec, h_linea, str_tec, border=0, align="C")
+        
+        # Imprimir Familia - Grupo
+        pdf.set_xy(10 + w_id + w_com + w_tec, y_pos + 1)
+        pdf.multi_cell(w_func, h_linea, str_func, border=0, align="C")
+        
+        # Imprimir Dosis
+        pdf.set_xy(10 + w_id + w_com + w_tec + w_func, y_pos + (row_h - h_linea)/2)
+        pdf.multi_cell(w_cant, h_linea, str_cant, border=0, align="C")
+        
+        # Mover el cursor Y al final del renglón para la siguiente fila
         pdf.set_y(y_pos + row_h)
 
     # ----------------------------------------------------

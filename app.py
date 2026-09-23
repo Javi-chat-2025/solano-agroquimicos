@@ -497,7 +497,7 @@ def generar_pdf_estilo_solano(
         str_func = str(prod.get("uso", ""))
         str_cant = f"{prod.get('dosis', '')} {prod.get('unidad', '')}"
         
-        # Calcular cuantas líneas tomará el texto más largo en este renglón
+        # Calcular cuántas líneas tomará el texto más largo en este renglón
         num_lineas_com = len(pdf.multi_cell(w_com, h_linea, str_com, dry_run=True, output="LINES"))
         num_lineas_tec = len(pdf.multi_cell(w_tec, h_linea, str_tec, dry_run=True, output="LINES"))
         num_lineas_func = len(pdf.multi_cell(w_func, h_linea, str_func, dry_run=True, output="LINES"))

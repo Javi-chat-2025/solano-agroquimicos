@@ -6,3 +6,4 @@ fpdf2
 extra_streamlit_components
 qrcode
 python-dotenv
+pytz

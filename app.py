@@ -799,7 +799,8 @@ with tab_nueva_receta:
                 f"📍 **Ubicación:** {huerta_info.get('ubicacion') or 'Sin ubicación'}"
             )
             
-            fecha_receta = st.text_input("Fecha (Día/Mes/Año)", value=obtener_fecha_actual(), disabled=True)
+            fecha_receta_dt = st.date_input("Fecha de la Receta *", value=datetime.now(), format="DD/MM/YYYY")
+            fecha_receta = fecha_receta_dt.strftime("%d/%m/%Y")
             num_factura_autoincrementado = obtener_siguiente_num_factura()
             volumen_tanque = st.text_input("Volumen del Tanque", value="2000 litros")
             objetivo_aplicacion = st.text_input("Objetivo de la Aplicación", value="Aplicación para defoliadores + control de hongos")

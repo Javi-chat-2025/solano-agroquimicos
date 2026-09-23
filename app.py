@@ -288,6 +288,7 @@ def confirmar_eliminar_cliente(cliente):
         if st.button("🔥 Sí, eliminar", type="primary", use_container_width=True):
             try:
                 supabase.table("clientes").delete().eq("id_cliente", cliente["id_cliente"]).execute()
+                st.session_state.cliente_sel = None
                 st.success("Cliente eliminado con éxito.")
                 st.rerun()
             except Exception:
@@ -306,6 +307,7 @@ def confirmar_eliminar_huerta(huerta):
         if st.button("🔥 Sí, eliminar", type="primary", use_container_width=True):
             try:
                 supabase.table("huertas").delete().eq("id_huerta", huerta["id_huerta"]).execute()
+                st.session_state.huerta_sel = None
                 st.success("Huerta eliminada con éxito.")
                 st.rerun()
             except Exception:
@@ -469,9 +471,9 @@ def generar_pdf_estilo_solano(
     # ----------------------------------------------------
     w_id = 20
     w_com = 45
-    w_tec = 65  # Ampliado para Ingrediente Activo
-    w_func = 35 # Familia - Grupo
-    w_cant = 25 # Dosis
+    w_tec = 65
+    w_func = 35
+    w_cant = 25
     
     pdf.set_fill_color(140, 30, 130)
     pdf.set_text_color(255, 255, 255)
@@ -486,7 +488,7 @@ def generar_pdf_estilo_solano(
     pdf.set_font("Helvetica", "", 7)
     pdf.set_draw_color(220, 220, 220)
     
-    h_linea = 4.0  # Altura por cada línea individual de texto
+    h_linea = 4.0
     
     for prod in productos_detalle:
         pdf.set_text_color(40, 40, 40)
@@ -497,47 +499,38 @@ def generar_pdf_estilo_solano(
         str_func = str(prod.get("uso", ""))
         str_cant = f"{prod.get('dosis', '')} {prod.get('unidad', '')}"
         
-        # Calcular cuántas líneas tomará el texto más largo en este renglón
         num_lineas_com = len(pdf.multi_cell(w_com, h_linea, str_com, dry_run=True, output="LINES"))
         num_lineas_tec = len(pdf.multi_cell(w_tec, h_linea, str_tec, dry_run=True, output="LINES"))
         num_lineas_func = len(pdf.multi_cell(w_func, h_linea, str_func, dry_run=True, output="LINES"))
         
         max_lineas = max(1, num_lineas_com, num_lineas_tec, num_lineas_func)
-        row_h = max_lineas * h_linea + 2  # Altura total adaptativa con margen interno
+        row_h = max_lineas * h_linea + 2
         
         y_pos = pdf.get_y()
         
-        # Dibujar rectángulos de fondo/borde para mantener la estructura uniforme
         pdf.rect(10, y_pos, w_id, row_h)
         pdf.rect(10 + w_id, y_pos, w_com, row_h)
         pdf.rect(10 + w_id + w_com, y_pos, w_tec, row_h)
         pdf.rect(10 + w_id + w_com + w_tec, y_pos, w_func, row_h)
         
-        # Resaltado amarillo para la dosis
         pdf.set_fill_color(250, 235, 70)
         pdf.rect(10 + w_id + w_com + w_tec + w_func, y_pos, w_cant, row_h, style='DF')
         
-        # Imprimir ID
         pdf.set_xy(10, y_pos + (row_h - h_linea)/2)
         pdf.multi_cell(w_id, h_linea, str_id, border=0, align="C")
         
-        # Imprimir Nombre Comercial
         pdf.set_xy(10 + w_id, y_pos + 1)
         pdf.multi_cell(w_com, h_linea, str_com, border=0, align="C")
         
-        # Imprimir Ingrediente Activo
         pdf.set_xy(10 + w_id + w_com, y_pos + 1)
         pdf.multi_cell(w_tec, h_linea, str_tec, border=0, align="C")
         
-        # Imprimir Familia - Grupo
         pdf.set_xy(10 + w_id + w_com + w_tec, y_pos + 1)
         pdf.multi_cell(w_func, h_linea, str_func, border=0, align="C")
         
-        # Imprimir Dosis
         pdf.set_xy(10 + w_id + w_com + w_tec + w_func, y_pos + (row_h - h_linea)/2)
         pdf.multi_cell(w_cant, h_linea, str_cant, border=0, align="C")
         
-        # Mover el cursor Y al final del renglón para la siguiente fila
         pdf.set_y(y_pos + row_h)
 
     # ----------------------------------------------------
@@ -844,6 +837,8 @@ with tab_nueva_receta:
             
             st.divider()
 
+            # Evitar mutación directa en ciclo iterativo asignando un índice a borrar
+            idx_a_eliminar = None
             for idx, item in enumerate(st.session_state.productos_receta_temp):
                 c_id, c_com, c_tec, c_func, c_cant, c_del = st.columns(
                     [1.0, 2.5, 2.5, 2.0, 1.8, 0.7]
@@ -856,8 +851,11 @@ with tab_nueva_receta:
                 with c_cant: st.write(f"{item['dosis']} {item['unidad']}")
                 with c_del:
                     if st.button("❌", key=f"del_prod_receta_{idx}"):
-                        st.session_state.productos_receta_temp.pop(idx)
-                        st.rerun()
+                        idx_a_eliminar = idx
+
+            if idx_a_eliminar is not None:
+                st.session_state.productos_receta_temp.pop(idx_a_eliminar)
+                st.rerun()
 
             st.write("")
             col_b1, col_b2 = st.columns([1, 4])
@@ -1031,7 +1029,7 @@ with tab_visitas:
                         )
 
                         st.download_button(
-                            label="📲 Agregar al iPhone",
+                            label="📲 Agregar al Calendar",
                             data=ics_bytes,
                             file_name=f"Visita_{nombre_huerta}_{fecha_obj.strftime('%d%m%Y')}.ics",
                             mime="text/calendar",
@@ -1274,7 +1272,6 @@ with tab_productos:
                     else:
                         df_import = pd.read_excel(archivo_excel)
                     
-                    # Mapeo flexible para renombrar las columnas del Excel hacia las columnas de Supabase
                     mapa_columnas = {
                         "Ingrediente Activo (con concentración)": "nombre_tecnico",
                         "Ingrediente Activo": "nombre_tecnico",
@@ -1294,7 +1291,6 @@ with tab_productos:
                         st.error(f"❌ Al archivo le faltan columnas obligatorias: {cols_requeridas - cols_presentes}")
                     else:
                         if st.button("🚀 Cargar Productos a la Base de Datos", type="primary"):
-                            # Filtrar solo las columnas existentes en la tabla 'productos'
                             cols_permitidas = ["id_producto", "nombre_comercial", "nombre_tecnico", "uso"]
                             cols_validas = [col for col in cols_permitidas if col in df_import.columns]
                             

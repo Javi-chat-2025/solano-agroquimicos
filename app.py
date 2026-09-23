@@ -799,7 +799,10 @@ with tab_nueva_receta:
                 f"📍 **Ubicación:** {huerta_info.get('ubicacion') or 'Sin ubicación'}"
             )
             
-            fecha_receta = st.text_input("Fecha (Día/Mes/Año)", value=obtener_fecha_actual(), disabled=True)
+            # SE PERMITE SELECCIONAR O MODIFICAR LA FECHA DE LA RECETA MEDIANTE DATE_INPUT
+            fecha_receta_dt = st.date_input("Fecha de Receta", value=datetime.now(), format="DD/MM/YYYY")
+            fecha_receta = fecha_receta_dt.strftime("%d/%m/%Y")
+            
             num_factura_autoincrementado = obtener_siguiente_num_factura()
             volumen_tanque = st.text_input("Volumen del Tanque", value="2000 litros")
             objetivo_aplicacion = st.text_input("Objetivo de la Aplicación", value="Aplicación para defoliadores + control de hongos")
@@ -967,6 +970,7 @@ with tab_visitas:
                 btn_guardar_visita = st.form_submit_button("💾 Agendar Visita", type="primary", use_container_width=True)
 
                 if btn_guardar_visita:
+                    # CORRECCIÓN EN COMBINACIÓN DE FECHA Y HORA
                     fecha_hora_dt = datetime.combine(fecha_v, hora_v)
 
                     try:
@@ -998,7 +1002,12 @@ with tab_visitas:
                 h_info = v.get("huertas") or {}
                 c_info = h_info.get("clientes") or {}
                 
-                fecha_obj = datetime.fromisoformat(v["fecha_visita"].replace("Z", ""))
+                # PARSEO ROBUSTO DE FECHA HORA
+                try:
+                    fecha_obj = datetime.fromisoformat(v["fecha_visita"].replace("Z", ""))
+                except Exception:
+                    fecha_obj = datetime.now()
+
                 fecha_formateada = fecha_obj.strftime("%d/%m/%Y a las %I:%M %p")
                 
                 nombre_cliente = c_info.get("nombre", "Cliente General")

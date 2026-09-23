@@ -3,7 +3,6 @@ import io
 import json
 import hashlib
 from datetime import datetime, timedelta
-import zoneinfo
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
@@ -36,23 +35,10 @@ def cargar_css(nombre_archivo="style.css"):
 cargar_css("style.css")
 
 # ==========================================
-# FUNCIONES AUXILIARES GENERALES Y FECHA
+# FUNCIONES AUXILIARES GENERALES
 # ==========================================
 def obtener_fecha_actual():
-    """Obtiene la fecha actual fijada en la zona horaria de México."""
-    try:
-        tz_mex = zoneinfo.ZoneInfo("America/Mexico_City")
-        return datetime.now(tz_mex).strftime("%d/%m/%Y")
-    except Exception:
-        return datetime.now().strftime("%d/%m/%Y")
-
-def obtener_datetime_actual():
-    """Obtiene el objeto datetime con la zona horaria de México."""
-    try:
-        tz_mex = zoneinfo.ZoneInfo("America/Mexico_City")
-        return datetime.now(tz_mex)
-    except Exception:
-        return datetime.now()
+    return datetime.now().strftime("%d/%m/%Y")
 
 def formatear_id_cliente(id_raw):
     if id_raw is None:
@@ -112,7 +98,7 @@ def obtener_siguiente_num_factura():
 # ==========================================
 def generar_sello_y_qr(num_factura, cliente_nombre, huerta_nombre, fecha, productos_detalle):
     """Genera sello Hash SHA-256 e imagen QR con los datos legibles de la receta."""
-    fecha_hora_emision = obtener_datetime_actual().strftime("%d/%m/%Y %H:%M:%S")
+    fecha_hora_emision = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     
     resumen_productos = []
     if productos_detalle:
@@ -263,7 +249,7 @@ def pantalla_login():
                                 st.session_state.autenticado = True
                                 st.session_state.usuario = user_clean
                                 
-                                fecha_exp = obtener_datetime_actual() + timedelta(days=7)
+                                fecha_exp = datetime.now() + timedelta(days=7)
                                 cookie_manager.set(
                                     cookie="solano_session", 
                                     val=json.dumps(user_clean), 
@@ -302,7 +288,6 @@ def confirmar_eliminar_cliente(cliente):
         if st.button("🔥 Sí, eliminar", type="primary", use_container_width=True):
             try:
                 supabase.table("clientes").delete().eq("id_cliente", cliente["id_cliente"]).execute()
-                st.session_state.cliente_sel = None
                 st.success("Cliente eliminado con éxito.")
                 st.rerun()
             except Exception:
@@ -321,7 +306,6 @@ def confirmar_eliminar_huerta(huerta):
         if st.button("🔥 Sí, eliminar", type="primary", use_container_width=True):
             try:
                 supabase.table("huertas").delete().eq("id_huerta", huerta["id_huerta"]).execute()
-                st.session_state.huerta_sel = None
                 st.success("Huerta eliminada con éxito.")
                 st.rerun()
             except Exception:
@@ -413,15 +397,19 @@ def generar_pdf_estilo_solano(
     pdf.add_page()
     pdf.set_auto_page_break(auto=False)
     
-    # ENCABEZADO
+    # ----------------------------------------------------
+    # 1. ENCABEZADO (LOGO Y DATOS DE EMPRESA / FECHA)
+    # ----------------------------------------------------
     if os.path.exists(logo_path):
         pdf.image(logo_path, x=10, y=8, w=22)
     
+    # Título central
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_text_color(40, 40, 40)
     pdf.set_xy(10, 8)
     pdf.cell(190, 6, "RECETA DE APLICACIÓN", align="C", ln=True)
     
+    # Subtítulos / Datos Empresa (Izquierda)
     x_empresa = 35 if os.path.exists(logo_path) else 10
     pdf.set_font("Helvetica", "B", 8.5)
     pdf.set_text_color(120, 120, 120)
@@ -429,14 +417,18 @@ def generar_pdf_estilo_solano(
     pdf.set_font("Helvetica", "", 7.5)
     pdf.text(x_empresa, 22, subtitulo)
     
+    # Fecha (Derecha)
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_text_color(40, 40, 40)
     pdf.text(145, 20, f"FECHA: {fecha}")
     
+    # Línea divisora
     pdf.set_draw_color(210, 210, 210)
     pdf.line(10, 28, 200, 28)
     
-    # DATOS CLIENTE/HUERTA
+    # ----------------------------------------------------
+    # 2. DATOS DEL CLIENTE Y HUERTA
+    # ----------------------------------------------------
     pdf.set_xy(10, 31)
     pdf.set_font("Helvetica", "B", 7.5)
     pdf.set_text_color(120, 120, 120)
@@ -445,17 +437,22 @@ def generar_pdf_estilo_solano(
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(255, 255, 255)
     
+    # Cuadro Cliente (Azul)
     pdf.set_fill_color(0, 150, 214)
     pdf.cell(190, 5, f"  Cliente: {cliente_nombre}", fill=True, ln=True)
     
+    # Cuadro Huerta (Verde)
     pdf.set_fill_color(46, 160, 67)
     pdf.cell(190, 5, f"  Nombre de la Huerta: {huerta_nombre}", fill=True, ln=True)
     
+    # Cuadro Ubicación (Verde Oscuro)
     if huerta_ubicacion:
         pdf.set_fill_color(35, 130, 55)
         pdf.cell(190, 5, f"  Ubicación: {huerta_ubicacion}", fill=True, ln=True)
         
-    # OBJETIVO
+    # ----------------------------------------------------
+    # 3. OBJETIVO DE LA APLICACIÓN
+    # ----------------------------------------------------
     pdf.ln(3)
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(40, 40, 40)
@@ -467,8 +464,14 @@ def generar_pdf_estilo_solano(
     
     pdf.ln(4)
     
-    # TABLA PRODUCTOS
-    w_id, w_com, w_tec, w_func, w_cant = 20, 45, 65, 35, 25
+    # ----------------------------------------------------
+    # 4. TABLA DE PRODUCTOS (CON MULTI-LÍNEA DINÁMICA)
+    # ----------------------------------------------------
+    w_id = 20
+    w_com = 45
+    w_tec = 65  # Ampliado para Ingrediente Activo
+    w_func = 35 # Familia - Grupo
+    w_cant = 25 # Dosis
     
     pdf.set_fill_color(140, 30, 130)
     pdf.set_text_color(255, 255, 255)
@@ -483,7 +486,7 @@ def generar_pdf_estilo_solano(
     pdf.set_font("Helvetica", "", 7)
     pdf.set_draw_color(220, 220, 220)
     
-    h_linea = 4.0
+    h_linea = 4.0  # Altura por cada línea individual de texto
     
     for prod in productos_detalle:
         pdf.set_text_color(40, 40, 40)
@@ -494,41 +497,52 @@ def generar_pdf_estilo_solano(
         str_func = str(prod.get("uso", ""))
         str_cant = f"{prod.get('dosis', '')} {prod.get('unidad', '')}"
         
+        # Calcular cuántas líneas tomará el texto más largo en este renglón
         num_lineas_com = len(pdf.multi_cell(w_com, h_linea, str_com, dry_run=True, output="LINES"))
         num_lineas_tec = len(pdf.multi_cell(w_tec, h_linea, str_tec, dry_run=True, output="LINES"))
         num_lineas_func = len(pdf.multi_cell(w_func, h_linea, str_func, dry_run=True, output="LINES"))
         
         max_lineas = max(1, num_lineas_com, num_lineas_tec, num_lineas_func)
-        row_h = max_lineas * h_linea + 2
+        row_h = max_lineas * h_linea + 2  # Altura total adaptativa con margen interno
         
         y_pos = pdf.get_y()
         
+        # Dibujar rectángulos de fondo/borde para mantener la estructura uniforme
         pdf.rect(10, y_pos, w_id, row_h)
         pdf.rect(10 + w_id, y_pos, w_com, row_h)
         pdf.rect(10 + w_id + w_com, y_pos, w_tec, row_h)
         pdf.rect(10 + w_id + w_com + w_tec, y_pos, w_func, row_h)
         
+        # Resaltado amarillo para la dosis
         pdf.set_fill_color(250, 235, 70)
         pdf.rect(10 + w_id + w_com + w_tec + w_func, y_pos, w_cant, row_h, style='DF')
         
+        # Imprimir ID
         pdf.set_xy(10, y_pos + (row_h - h_linea)/2)
         pdf.multi_cell(w_id, h_linea, str_id, border=0, align="C")
         
+        # Imprimir Nombre Comercial
         pdf.set_xy(10 + w_id, y_pos + 1)
         pdf.multi_cell(w_com, h_linea, str_com, border=0, align="C")
         
+        # Imprimir Ingrediente Activo
         pdf.set_xy(10 + w_id + w_com, y_pos + 1)
         pdf.multi_cell(w_tec, h_linea, str_tec, border=0, align="C")
         
+        # Imprimir Familia - Grupo
         pdf.set_xy(10 + w_id + w_com + w_tec, y_pos + 1)
         pdf.multi_cell(w_func, h_linea, str_func, border=0, align="C")
         
+        # Imprimir Dosis
         pdf.set_xy(10 + w_id + w_com + w_tec + w_func, y_pos + (row_h - h_linea)/2)
         pdf.multi_cell(w_cant, h_linea, str_cant, border=0, align="C")
         
+        # Mover el cursor Y al final del renglón para la siguiente fila
         pdf.set_y(y_pos + row_h)
 
-    # FIRMA Y SELLO
+    # ----------------------------------------------------
+    # 5. FIRMA DEL ASESOR TÉCNICO
+    # ----------------------------------------------------
     pdf.set_y(230)
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(40, 40, 40)
@@ -537,6 +551,9 @@ def generar_pdf_estilo_solano(
     pdf.cell(190, 3, asesor_ced, align="C", ln=True)
     pdf.cell(190, 3, asesor_rfc, align="C", ln=True)
     
+    # ----------------------------------------------------
+    # 6. SELLO DIGITAL Y QR
+    # ----------------------------------------------------
     datos_qr = generar_sello_y_qr(
         num_factura=num_factura,
         cliente_nombre=cliente_nombre,
@@ -546,6 +563,7 @@ def generar_pdf_estilo_solano(
     )
     
     sello_texto = sello_digital if sello_digital else datos_qr["sello"]
+    
     y_sello = 250
     
     pdf.set_fill_color(248, 249, 250)
@@ -781,8 +799,7 @@ with tab_nueva_receta:
                 f"📍 **Ubicación:** {huerta_info.get('ubicacion') or 'Sin ubicación'}"
             )
             
-            # Campo dinámico de fecha con la zona horaria de México
-            fecha_receta = st.text_input("Fecha (Día/Mes/Año) *", value=obtener_fecha_actual())
+            fecha_receta = st.text_input("Fecha (Día/Mes/Año)", value=obtener_fecha_actual(), disabled=True)
             num_factura_autoincrementado = obtener_siguiente_num_factura()
             volumen_tanque = st.text_input("Volumen del Tanque", value="2000 litros")
             objetivo_aplicacion = st.text_input("Objetivo de la Aplicación", value="Aplicación para defoliadores + control de hongos")
@@ -827,7 +844,6 @@ with tab_nueva_receta:
             
             st.divider()
 
-            idx_a_eliminar = None
             for idx, item in enumerate(st.session_state.productos_receta_temp):
                 c_id, c_com, c_tec, c_func, c_cant, c_del = st.columns(
                     [1.0, 2.5, 2.5, 2.0, 1.8, 0.7]
@@ -840,11 +856,8 @@ with tab_nueva_receta:
                 with c_cant: st.write(f"{item['dosis']} {item['unidad']}")
                 with c_del:
                     if st.button("❌", key=f"del_prod_receta_{idx}"):
-                        idx_a_eliminar = idx
-
-            if idx_a_eliminar is not None:
-                st.session_state.productos_receta_temp.pop(idx_a_eliminar)
-                st.rerun()
+                        st.session_state.productos_receta_temp.pop(idx)
+                        st.rerun()
 
             st.write("")
             col_b1, col_b2 = st.columns([1, 4])
@@ -947,18 +960,22 @@ with tab_visitas:
                 with col_f1:
                     fecha_v = st.date_input("Fecha de la visita *", format="DD/MM/YYYY")
                 with col_f2:
-                    hora_v = st.time_input("Hora aproximada *")
+                    opciones_horas = [
+                        "06:00 AM", "06:30 AM", "07:00 AM", "07:30 AM", "08:00 AM", "08:30 AM",
+                        "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+                        "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM",
+                        "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM",
+                        "06:00 PM", "06:30 PM", "07:00 PM", "07:30 PM", "08:00 PM"
+                    ]
+                    hora_v_str = st.selectbox("Hora aproximada *", opciones_horas, index=6)
 
                 notas_v = st.text_area("Objetivo / Notas de la visita", placeholder="Ej. Revisión de plagas, foliarización o aplicación de nutrientes...")
 
                 btn_guardar_visita = st.form_submit_button("💾 Agendar Visita", type="primary", use_container_width=True)
 
                 if btn_guardar_visita:
-                    try:
-                        tz_mex = zoneinfo.ZoneInfo("America/Mexico_City")
-                        fecha_hora_dt = datetime.combine(fecha_v, hora_v).replace(tzinfo=tz_mex)
-                    except Exception:
-                        fecha_hora_dt = datetime.combine(fecha_v, hora_v)
+                    hora_v = datetime.strptime(hora_v_str, "%I:%M %p").time()
+                    fecha_hora_dt = datetime.combine(fecha_v, hora_v)
 
                     try:
                         supabase.table("visitas").insert({
@@ -1022,7 +1039,7 @@ with tab_visitas:
                         )
 
                         st.download_button(
-                            label="📲 Agregar al Calendar",
+                            label="📲 Agregar al iPhone",
                             data=ics_bytes,
                             file_name=f"Visita_{nombre_huerta}_{fecha_obj.strftime('%d%m%Y')}.ics",
                             mime="text/calendar",

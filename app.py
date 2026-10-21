@@ -475,7 +475,7 @@ def generar_pdf_estilo_solano(
     pdf.cell(w_com, 6, "Nombre Comercial", fill=True, align="C")
     pdf.cell(w_tec, 6, "Ingrediente Activo", fill=True, align="C")
     pdf.cell(w_func, 6, "Familia - Grupo", fill=True, align="C")
-    pdf.cell(w_cant, 6, "Dosis", fill=True, align="C", ln=True)
+    pdf.cell(w_cant, 6, "Dosis / 2000 L", fill=True, align="C", ln=True)
     
     pdf.set_font("Helvetica", "", 7)
     pdf.set_draw_color(220, 220, 220)

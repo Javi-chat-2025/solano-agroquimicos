@@ -796,7 +796,7 @@ with tab_nueva_receta:
             with col_d1:
                 dosis_val = st.text_input("Cantidad / Dosis", value="1")
             with col_d2:
-                unidad_val = st.selectbox("Unidad", ["lt", "kg", "g", "ml", "L / Ha", "Kg / Ha"])
+                unidad_val = st.selectbox("Unidad", ["ml","lt", "gr", "kg"," ml / Ha", "lt / Ha", "gr / Ha","kg / Ha"])
                 
             if st.button("➕ Añadir Producto"):
                 st.session_state.productos_receta_temp.append({

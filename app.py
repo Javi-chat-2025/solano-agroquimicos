@@ -822,7 +822,7 @@ with tab_nueva_receta:
             with col_h_com: st.markdown("**Nombre Comercial**")
             with col_h_tec: st.markdown("**Ingrediente Activo**")
             with col_h_func: st.markdown("**Familia - Grupo**")
-            with col_h_cant: st.markdown("**Dosis**")
+            with col_h_cant: st.markdown("**Dosis /2000**")
             with col_h_del: st.markdown("**Acción**")
             
             st.divider()

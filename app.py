@@ -415,7 +415,18 @@ def generar_pdf_estilo_solano(
     """Receta A4 rediseñada. Mantiene el logotipo original y los datos guardados."""
     productos_detalle = productos_detalle or []
     fecha = fecha or obtener_fecha_actual()
-    pdf = FPDF(format="A4")
+    class PDFReceta(FPDF):
+        def footer(self):
+            # Pie presente en todas las páginas, también en continuaciones.
+            self.set_y(-13)
+            self.set_draw_color(215, 226, 216)
+            self.line(10, self.get_y(), 200, self.get_y())
+            self.set_font("Helvetica", "", 8.5)
+            self.set_text_color(92, 105, 112)
+            self.cell(0, 8, f"Página {self.page_no()} de {{nb}}", align="C")
+
+    pdf = PDFReceta(format="A4")
+    pdf.alias_nb_pages()
     pdf.set_auto_page_break(auto=False)
     VERDE = (27, 67, 50)
     VERDE_MEDIO = (45, 106, 79)
@@ -474,15 +485,11 @@ def generar_pdf_estilo_solano(
         set_color(VERDE)
         pdf.set_xy(10, 39)
         pdf.cell(190, 9, "RECETA DE APLICACIÓN", align="C")
-        pdf.set_font("Helvetica", "", 9)
-        set_color(GRIS)
-        pdf.set_xy(10, 49)
-        pdf.cell(190, 5, f"Folio: {limpio(num_factura)}" + ("  |  Continuación" if continuacion else ""), align="C")
         if continuacion:
-            return 61
+            return 55
 
         # Datos del productor. En renglones separados, para permitir nombres extensos.
-        y = 59
+        y = 54
         for etiqueta, valor in (
             ("CLIENTE", cliente_nombre),
             ("NOMBRE DE LA HUERTA", huerta_nombre),
@@ -514,11 +521,7 @@ def generar_pdf_estilo_solano(
         pdf.rect(10, y + 7, 190, alto_objetivo - 7, style="F")
         texto_ajustado(13, y + 9, 184, objetivo, 10.5)
         y += alto_objetivo + 7
-        pdf.set_font("Helvetica", "", 9)
-        set_color(GRIS)
-        pdf.set_xy(10, y)
-        pdf.cell(190, 5, f"Volumen del tanque: {limpio(volumen_tanque)}")
-        return y + 10
+        return y + 4
 
     def cabecera_tabla(y):
         pdf.set_fill_color(*VERDE)
@@ -532,7 +535,7 @@ def generar_pdf_estilo_solano(
             x += ancho
         return y + 12
 
-    def fila(y, prod, indice):
+    def fila(y, prod, indice, ultimo=False):
         valores = [
             prod.get("nombre_comercial", ""),
             prod.get("nombre_tecnico", ""),
@@ -541,8 +544,10 @@ def generar_pdf_estilo_solano(
         ]
         alturas = [len(lineas(valor, col, 9.5, idx in (0, 3))) for idx, (valor, col) in enumerate(zip(valores, COLS))]
         altura = max(12, max(alturas) * 5.1 + 5)
-        # Reservar espacio para sección de firma/verificación al final; páginas nuevas automáticas.
-        if y + altura > 222:
+        # Filas normales: hasta 265 mm. Para la ÚLTIMA fila reservamos
+        # espacio real para firma, QR y pie, moviéndola a la página siguiente
+        # antes de dibujarla si hace falta. Nunca se corta una fila.
+        if (y + altura > 264) or (ultimo and y + altura + 80 > 282):
             y = cabecera_tabla(encabezado(continuacion=True))
         x = 10
         for i, (ancho, valor) in enumerate(zip(COLS, valores)):
@@ -559,32 +564,31 @@ def generar_pdf_estilo_solano(
 
     y = cabecera_tabla(encabezado())
     if not productos_detalle:
-        y = fila(y, {"nombre_comercial": "Sin productos registrados"}, 0)
+        y = fila(y, {"nombre_comercial": "Sin productos registrados"}, 0, ultimo=True)
     else:
         for i, prod in enumerate(productos_detalle):
-            y = fila(y, prod, i)
+            y = fila(y, prod, i, ultimo=(i == len(productos_detalle) - 1))
 
-    # Nunca encimar asesor ni verificación con la tabla.
-    if y + 64 > 282:
-        encabezado(continuacion=True)
-        y = 65
-    y = max(y + 9, 225 if pdf.page_no() == 1 else y + 9)
-    if y + 55 > 289:
-        encabezado(continuacion=True)
-        y = 68
+    # Reservar firma (~21 mm), separación y QR (29 mm) + pie (13 mm).
+    # El pie nunca invade la caja de autenticidad.
+    y = max(y + 10, 196 if pdf.page_no() == 1 else y + 10)
+    if y + 68 > 282:
+        # En caso de datos generales extraordinariamente extensos,
+        # se abre página nueva sin sobreponer contenido.
+        y = encabezado(continuacion=True) + 18
 
     pdf.set_draw_color(*VERDE_MEDIO)
-    pdf.line(50, y, 160, y)
-    texto_ajustado(10, y + 3, 190, asesor_nombre, 10.5, True, align="C")
-    texto_ajustado(10, y + 9, 190, asesor_ced, 9.5, align="C")
-    texto_ajustado(10, y + 14, 190, asesor_rfc, 9.5, align="C")
+    pdf.line(50, y + 13, 160, y + 13)
+    texto_ajustado(10, y + 16, 190, asesor_nombre, 10.5, True, align="C")
+    texto_ajustado(10, y + 22, 190, asesor_ced, 9.5, align="C")
+    texto_ajustado(10, y + 27, 190, asesor_rfc, 9.5, align="C")
 
     datos_qr = generar_sello_y_qr(
         num_factura=num_factura, cliente_nombre=cliente_nombre,
         huerta_nombre=huerta_nombre, fecha=fecha, productos_detalle=productos_detalle
     )
     sello_texto = sello_digital or datos_qr["sello"]
-    y_qr = y + 25
+    y_qr = y + 37
     pdf.set_draw_color(*VERDE_MEDIO)
     pdf.set_fill_color(248, 251, 248)
     pdf.rect(10, y_qr, 190, 29, style="DF")

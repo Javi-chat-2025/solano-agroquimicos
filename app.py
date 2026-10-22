@@ -238,7 +238,7 @@ def pantalla_login():
             st.caption("Solano Agroquímicos — Sistema de Gestión")
             
             with st.form("form_login"):
-                correo_input = st.text_input("Correo Electrónico", placeholder="Introduce el correo")
+                correo_input = st.text_input("📧 Correo electrónico", placeholder="Introduce el correo")
                 pass_input = st.text_input("Contraseña", type="password", placeholder="••••••••")
                 btn_ingresar = st.form_submit_button("Ingresar al Sistema", type="primary", use_container_width=True)
                 
@@ -577,6 +577,88 @@ def generar_pdf_estilo_solano(
     return pdf.output()
 
 # ==========================================
+# EDICIÓN SEGURA: CREA UNA NUEVA VERSIÓN DE RECETA
+# Se conserva la receta original y su historial.
+# ==========================================
+@st.dialog("✏️ Editar receta", width="large")
+def editar_receta(receta, cliente, huerta):
+    st.info(f"Estás editando la receta #{receta['id_receta']}. Al guardar se creará una versión nueva en esta misma huerta, conservando la original.")
+    try:
+        catalogo = supabase.table("productos").select("id_producto,nombre_comercial,nombre_tecnico,uso").execute().data or []
+    except Exception as e:
+        st.error(f"No se pudo cargar el catálogo: {e}")
+        return
+    por_id = {str(p["id_producto"]): p for p in catalogo}
+    anteriores = {}
+    for detalle in receta.get("receta_detalles", []):
+        prod = detalle.get("productos") or {}
+        codigo = str(prod.get("id_producto", ""))
+        if codigo:
+            anteriores[codigo] = detalle
+    faltantes = set(anteriores) - set(por_id)
+    if faltantes:
+        st.error("La receta contiene productos que ya no están en el catálogo. No es seguro editarla hasta restaurarlos.")
+        return
+    with st.form(f"editar_receta_form_{receta['id_receta']}"):
+        try:
+            fecha_inicial = datetime.strptime(str(receta.get("fecha", "")), "%d/%m/%Y").date()
+        except ValueError:
+            fecha_inicial = obtener_datetime_local().date()
+        fecha = st.date_input("📅 Fecha de receta", value=fecha_inicial, format="DD/MM/YYYY")
+        volumen = st.text_input("🛢️ Volumen del tanque", value=str(receta.get("volumen_tanque") or ""))
+        objetivo = st.text_input("🎯 Objetivo de la aplicación", value=str(receta.get("objetivo") or ""))
+        st.markdown("#### 🧪 Productos y dosis")
+        opciones = list(por_id)
+        elegidos = st.multiselect(
+            "Selecciona los productos que debe incluir esta versión",
+            options=opciones,
+            default=list(anteriores),
+            format_func=lambda x: f"[{x}] {por_id[x]['nombre_comercial']}",
+        )
+        detalle_nuevo = []
+        unidades = ["ml", "lt", "gr", "kg", "ml / Ha", "lt / Ha", "gr / Ha", "kg / Ha", "ml / 2000 lt", "lt / 2000 lt", "gr / 2000 lt", "kg / 2000 lt"]
+        for i, codigo in enumerate(elegidos):
+            anterior = anteriores.get(codigo, {})
+            st.markdown(f"**{por_id[codigo]['nombre_comercial']}**")
+            dosis = st.text_input("💧 Dosis", value=str(anterior.get("dosis") or "1"), key=f"er_dosis_{receta['id_receta']}_{codigo}")
+            unidad_previa = str(anterior.get("unidad") or "ml").strip()
+            unidades_op = unidades if unidad_previa in unidades else [unidad_previa] + unidades
+            unidad = st.selectbox("📏 Unidad", unidades_op, index=unidades_op.index(unidad_previa), key=f"er_unidad_{receta['id_receta']}_{codigo}")
+            detalle_nuevo.append({"id_producto": por_id[codigo]["id_producto"], "dosis": dosis.strip(), "unidad": unidad})
+        confirmar = st.checkbox("Confirmo que revisé la información y deseo crear una versión corregida")
+        guardar = st.form_submit_button("💾 Guardar nueva versión", type="primary", use_container_width=True)
+    if guardar:
+        if not confirmar or not detalle_nuevo or not objetivo.strip() or not volumen.strip() or any(not d["dosis"] for d in detalle_nuevo):
+            st.error("Revisa los datos, selecciona al menos un producto y marca la confirmación.")
+            return
+        id_creado = None
+        try:
+            nueva_fecha = fecha.strftime("%d/%m/%Y")
+            folio = obtener_siguiente_num_factura()
+            nuevos_productos = [dict(por_id[str(d["id_producto"])], dosis=d["dosis"], unidad=d["unidad"]) for d in detalle_nuevo]
+            sello = generar_sello_y_qr(folio, cliente["nombre"], huerta["nombre_huerta"], nueva_fecha, nuevos_productos)["sello"]
+            res = supabase.table("recetas").insert({
+                "id_huerta": huerta["id_huerta"], "fecha": nueva_fecha, "num_factura": folio,
+                "objetivo": objetivo.strip(), "volumen_tanque": volumen.strip(), "sello_digital": sello,
+            }).execute()
+            if not res.data:
+                raise RuntimeError("No se recibió el identificador de la nueva receta")
+            id_creado = res.data[0]["id_receta"]
+            datos = [dict(d, id_receta=id_creado) for d in detalle_nuevo]
+            supabase.table("receta_detalles").insert(datos).execute()
+        except Exception as e:
+            if id_creado is not None:
+                try:
+                    supabase.table("receta_detalles").delete().eq("id_receta", id_creado).execute()
+                    supabase.table("recetas").delete().eq("id_receta", id_creado).execute()
+                except Exception:
+                    st.warning("No se pudo revertir automáticamente el registro incompleto. Revísalo en Supabase.")
+            st.error(f"No se pudo guardar la nueva versión: {e}")
+            return
+        st.session_state["receta_ultima_editada"] = id_creado
+        st.rerun()
+
+# ==========================================
 # PESTAÑA 1: EXPLORADOR POR PERFILES
 # ==========================================
 with tab_perfiles:
@@ -686,6 +768,8 @@ with tab_perfiles:
         if not recetas:
             st.info(f"No hay recetas emitidas para la huerta '{huerta['nombre_huerta']}'.")
         else:
+            if st.session_state.get("receta_ultima_editada"):
+                st.success(f"Nueva versión #{st.session_state.pop('receta_ultima_editada')} guardada. Puedes descargar su PDF en este perfil.")
             for r in recetas:
                 with st.container(border=True):
                     col_detalles, col_pdf = st.columns([3, 1])
@@ -743,6 +827,8 @@ with tab_perfiles:
                             key=f"dl_pdf_{r['id_receta']}",
                             type="primary"
                         )
+                        if st.button("✏️ Editar receta", key=f"editar_receta_{r['id_receta']}"):
+                            editar_receta(r, cliente, huerta)
 
 # ==========================================
 # PESTAÑA 2: EMITIR NUEVA RECETA
@@ -768,7 +854,7 @@ with tab_nueva_receta:
         
         with col_c1:
             st.markdown("### 1. Datos Generales")
-            huerta_sel_key = st.selectbox("Seleccionar Huerta *", list(dict_huertas.keys()))
+            huerta_sel_key = st.selectbox("🌳 Seleccionar huerta *", list(dict_huertas.keys()))
             huerta_info = dict_huertas[huerta_sel_key]
             
             cliente_info = huerta_info.get("clientes") or {}
@@ -780,23 +866,23 @@ with tab_nueva_receta:
                 f"📍 **Ubicación:** {huerta_info.get('ubicacion') or 'Sin ubicación'}"
             )
             
-            fecha_receta_dt = st.date_input("Fecha de Receta", value=obtener_datetime_local(), format="DD/MM/YYYY")
+            fecha_receta_dt = st.date_input("📅 Fecha de receta", value=obtener_datetime_local(), format="DD/MM/YYYY")
             fecha_receta = fecha_receta_dt.strftime("%d/%m/%Y")
             
             num_factura_autoincrementado = obtener_siguiente_num_factura()
-            volumen_tanque = st.text_input("Volumen del Tanque", value="2000 litros")
-            objetivo_aplicacion = st.text_input("Objetivo de la Aplicación", value="Aplicación para defoliadores + control de hongos")
+            volumen_tanque = st.text_input("🛢️ Volumen del tanque", value="2000 litros")
+            objetivo_aplicacion = st.text_input("🎯 Objetivo de la aplicación", value="Aplicación para defoliadores + control de hongos")
             
         with col_c2:
             st.markdown("### 2. Agregar Productos")
-            prod_sel_nombre = st.selectbox("Seleccionar Producto *", list(dict_prods.keys()))
+            prod_sel_nombre = st.selectbox("🧪 Seleccionar producto *", list(dict_prods.keys()))
             prod_info = dict_prods[prod_sel_nombre]
             
             col_d1, col_d2 = st.columns(2)
             with col_d1:
-                dosis_val = st.text_input("Cantidad / Dosis", value="1")
+                dosis_val = st.text_input("💧 Cantidad / dosis", value="1")
             with col_d2:
-                unidad_val = st.selectbox("Unidad", ["ml","lt", "gr", "kg"," ml / Ha", "lt / Ha", "gr / Ha","kg / Ha","ml / 2000 lt","lt / 2000 lt","gr / 2000 lt","kg / 2000 lt"])
+                unidad_val = st.selectbox("📏 Unidad", ["ml","lt", "gr", "kg"," ml / Ha", "lt / Ha", "gr / Ha","kg / Ha","ml / 2000 lt","lt / 2000 lt","gr / 2000 lt","kg / 2000 lt"])
                 
             if st.button("➕ Añadir Producto"):
                 st.session_state.productos_receta_temp.append({
@@ -941,11 +1027,11 @@ with tab_visitas:
 
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
-                    fecha_v = st.date_input("Fecha de la visita *", value=obtener_datetime_local(), format="DD/MM/YYYY")
+                    fecha_v = st.date_input("📅 Fecha de la visita *", value=obtener_datetime_local(), format="DD/MM/YYYY")
                 with col_f2:
-                    hora_v = st.time_input("Hora aproximada *", value=obtener_datetime_local().time())
+                    hora_v = st.time_input("🕒 Hora aproximada *", value=obtener_datetime_local().time())
 
-                notas_v = st.text_area("Objetivo / Notas de la visita", placeholder="Ej. Revisión de plagas, foliarización o aplicación de nutrientes...")
+                notas_v = st.text_area("📝 Objetivo / notas de la visita", placeholder="Ej. Revisión de plagas, foliarización o aplicación de nutrientes...")
 
                 btn_guardar_visita = st.form_submit_button("💾 Agendar Visita", type="primary", use_container_width=True)
 
@@ -1049,9 +1135,9 @@ with tab_registro:
             if cli_edit:
                 st.markdown("### ✏️ Editar Cliente")
                 with st.form("form_edit_cliente"):
-                    edit_nombre = st.text_input("Nombre completo *", value=cli_edit.get("nombre", ""))
-                    edit_telefono = st.text_input("Teléfono", value=cli_edit.get("telefono", "") or "")
-                    edit_correo = st.text_input("Correo electrónico *", value=cli_edit.get("correo", "") or "")
+                    edit_nombre = st.text_input("👤 Nombre completo *", value=cli_edit.get("nombre", ""))
+                    edit_telefono = st.text_input("📞 Teléfono", value=cli_edit.get("telefono", "") or "")
+                    edit_correo = st.text_input("📧 Correo electrónico *", value=cli_edit.get("correo", "") or "")
                     
                     c1, c2 = st.columns(2)
                     with c1:
@@ -1082,9 +1168,9 @@ with tab_registro:
             else:
                 st.markdown("### ➕ Registrar Nuevo Cliente")
                 with st.form("form_nuevo_cliente"):
-                    nuevo_nombre = st.text_input("Nombre completo *")
-                    nuevo_telefono = st.text_input("Teléfono")
-                    nuevo_correo = st.text_input("Correo electrónico *")
+                    nuevo_nombre = st.text_input("👤 Nombre completo *")
+                    nuevo_telefono = st.text_input("📞 Teléfono")
+                    nuevo_correo = st.text_input("📧 Correo electrónico *")
                     
                     guardar_cli = st.form_submit_button("💾 Registrar Cliente", type="primary")
                     
@@ -1149,9 +1235,9 @@ with tab_registro:
                 if hue_edit:
                     st.markdown("### ✏️ Editar Huerta")
                     with st.form("form_edit_huerta"):
-                        edit_nombre_h = st.text_input("Nombre de Huerta *", value=hue_edit.get("nombre_huerta", ""))
-                        edit_ubicacion_h = st.text_input("Ubicación", value=hue_edit.get("ubicacion", "") or "")
-                        edit_ha_h = st.number_input("Hectáreas", value=float(hue_edit.get("hectareas", 0.0) or 0.0))
+                        edit_nombre_h = st.text_input("🌳 Nombre de huerta *", value=hue_edit.get("nombre_huerta", ""))
+                        edit_ubicacion_h = st.text_input("📍 Ubicación", value=hue_edit.get("ubicacion", "") or "")
+                        edit_ha_h = st.number_input("📏 Hectáreas", value=float(hue_edit.get("hectareas", 0.0) or 0.0))
                         
                         default_cli_idx = 0
                         for idx, (k, v) in enumerate(dict_cli_lookup.items()):
@@ -1159,7 +1245,7 @@ with tab_registro:
                                 default_cli_idx = idx
                                 break
                                 
-                        edit_cli_key = st.selectbox("Cliente *", list(dict_cli_lookup.keys()), index=default_cli_idx)
+                        edit_cli_key = st.selectbox("👤 Cliente *", list(dict_cli_lookup.keys()), index=default_cli_idx)
                         
                         c1, c2 = st.columns(2)
                         with c1:
@@ -1191,10 +1277,10 @@ with tab_registro:
                 else:
                     st.markdown("### ➕ Registrar Nueva Huerta")
                     with st.form("form_nueva_huerta"):
-                        nuevo_nombre_h = st.text_input("Nombre de Huerta *")
-                        nuevo_ubicacion_h = st.text_input("Ubicación")
-                        nuevo_ha_h = st.number_input("Hectáreas", value=0.0, step=0.5)
-                        nuevo_cli_key = st.selectbox("Cliente *", list(dict_cli_lookup.keys()))
+                        nuevo_nombre_h = st.text_input("🌳 Nombre de huerta *")
+                        nuevo_ubicacion_h = st.text_input("📍 Ubicación")
+                        nuevo_ha_h = st.number_input("📏 Hectáreas", value=0.0, step=0.5)
+                        nuevo_cli_key = st.selectbox("👤 Cliente *", list(dict_cli_lookup.keys()))
                         
                         guardar_hue = st.form_submit_button("💾 Registrar Huerta", type="primary")
                         
@@ -1341,9 +1427,9 @@ with tab_productos:
             st.markdown("### ✏️ Editar Producto")
             with st.form("form_edit_producto"):
                 id_prod_val = st.text_input("ID / Código Producto *", value=prod_edit.get("id_producto", ""), disabled=True)
-                nombre_com = st.text_input("Nombre Comercial *", value=prod_edit.get("nombre_comercial", ""))
-                nombre_tec = st.text_input("Ingrediente Activo (con concentración)", value=prod_edit.get("nombre_tecnico", "") or "")
-                uso_val = st.text_input("Familia - Grupo", value=prod_edit.get("uso", "") or "")
+                nombre_com = st.text_input("🏷️ Nombre comercial *", value=prod_edit.get("nombre_comercial", ""))
+                nombre_tec = st.text_input("🧪 Ingrediente activo (con concentración)", value=prod_edit.get("nombre_tecnico", "") or "")
+                uso_val = st.text_input("🧬 Familia - Grupo", value=prod_edit.get("uso", "") or "")
                 
                 c1, c2 = st.columns(2)
                 with c1:
@@ -1375,9 +1461,9 @@ with tab_productos:
             st.markdown("### ➕ Registrar Nuevo Producto (Manual)")
             with st.form("form_nuevo_producto"):
                 id_prod_val = st.text_input("ID / Código Producto *", placeholder="Ej. PROD-001")
-                nombre_com = st.text_input("Nombre Comercial *", placeholder="Ej. Amistar Extra")
-                nombre_tec = st.text_input("Ingrediente Activo (con concentración)", placeholder="Ej. Azoxistrobin + Ciproconazol (200 g/L)")
-                uso_val = st.text_input("Familia - Grupo", placeholder="Ej. Estrobilurinas + Triazoles")
+                nombre_com = st.text_input("🏷️ Nombre comercial *", placeholder="Ej. Amistar Extra")
+                nombre_tec = st.text_input("🧪 Ingrediente activo (con concentración)", placeholder="Ej. Azoxistrobin + Ciproconazol (200 g/L)")
+                uso_val = st.text_input("🧬 Familia - Grupo", placeholder="Ej. Estrobilurinas + Triazoles")
                 
                 guardar_prod = st.form_submit_button("💾 Registrar Producto", type="primary")
                 

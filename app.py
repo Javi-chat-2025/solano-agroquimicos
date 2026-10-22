@@ -513,57 +513,57 @@ def generar_pdf_estilo_solano(
         pdf.cell(56, 6, f"FECHA: {limpio(fecha_pdf)}", align="R")
         pdf.set_font("Arial", "B", 17)
         set_color(VERDE)
-        pdf.set_xy(10, 39)
+        pdf.set_xy(10, 35)
         pdf.cell(190, 9, "RECETA DE APLICACIÓN", align="C")
         if continuacion:
-            return 55
+            return 52
 
         # Datos del productor. En renglones separados, para permitir nombres extensos.
-        y = 54
+        y = 49
         for etiqueta, valor in (
             ("CLIENTE", cliente_nombre),
             ("NOMBRE DE LA HUERTA", huerta_nombre),
             ("UBICACIÓN", huerta_ubicacion or "Sin ubicación"),
         ):
-            n = len(lineas(valor, 188, 10.5, True))
-            alto = max(11.5, 5.1 * n + 5)
+            n = len(lineas(valor, 141, 10.5, True))
+            alto = max(9.2, 5.1 * n + 2.5)
             pdf.set_fill_color(237, 247, 238)
             pdf.rect(10, y, 190, alto, style="F")
             pdf.set_fill_color(*VERDE)
             pdf.rect(10, y, 39, alto, style="F")
             pdf.set_font("Arial", "B", 8)
             set_color(BLANCO)
-            pdf.set_xy(12, y + 2)
+            pdf.set_xy(12, y + 1)
             pdf.multi_cell(35, 4.2, limpio(etiqueta), align="C")
-            texto_ajustado(52, y + 2.5, 145, valor, 10.5, True, align="L")
-            y += alto + 2
+            texto_ajustado(52, y + 1, 145, valor, 10.5, True, align="L")
+            y += alto + 1
 
-        y += 3
+        y += 1
         objetivo_lineas = len(lineas(objetivo, 186, 10.5))
-        alto_objetivo = max(17, 5.1 * objetivo_lineas + 12)
+        alto_objetivo = max(15, 5.1 * objetivo_lineas + 9)
         pdf.set_fill_color(247, 205, 66)
-        pdf.rect(10, y, 190, 7, style="F")
+        pdf.rect(10, y, 190, 6, style="F")
         pdf.set_font("Arial", "B", 10)
         set_color(VERDE)
-        pdf.set_xy(13, y + 1)
+        pdf.set_xy(13, y + 0.5)
         pdf.cell(184, 5, "OBJETIVO DE LA APLICACIÓN", align="C")
         pdf.set_fill_color(255, 250, 231)
-        pdf.rect(10, y + 7, 190, alto_objetivo - 7, style="F")
-        texto_ajustado(13, y + 9, 184, objetivo, 10.5, align="C")
-        y += alto_objetivo + 7
-        return y + 4
+        pdf.rect(10, y + 6, 190, alto_objetivo - 6, style="F")
+        texto_ajustado(13, y + 7, 184, objetivo, 10.5, align="C")
+        y += alto_objetivo + 2
+        return y + 2
 
     def cabecera_tabla(y):
         pdf.set_fill_color(*VERDE)
-        pdf.rect(10, y, ANCHO, 12, style="F")
+        pdf.rect(10, y, ANCHO, 10, style="F")
         x = 10
         for ancho, nombre in zip(COLS, ["Nombre Comercial", "Ingrediente Activo", "Familia - Grupo", "Dosis / 2000 L"]):
             pdf.set_font("Arial", "B", 9.2)
             set_color(BLANCO)
-            pdf.set_xy(x + 1, y + 3)
+            pdf.set_xy(x + 1, y + 2)
             pdf.multi_cell(ancho - 2, 5.4, nombre, align="C")
             x += ancho
-        return y + 12
+        return y + 10
 
     def fila(y, prod, indice, ultimo=False):
         valores = [
@@ -573,11 +573,11 @@ def generar_pdf_estilo_solano(
             (f"{prod.get('dosis', '')} {prod.get('unidad', '')}").strip(),
         ]
         alturas = [len(lineas(valor, col, 9.5, idx in (0, 3))) for idx, (valor, col) in enumerate(zip(valores, COLS))]
-        altura = max(12, max(alturas) * 5.1 + 5)
+        altura = max(10.5, max(alturas) * 5.1 + 3.5)
         # Filas normales: hasta 265 mm. Para la ÚLTIMA fila reservamos
         # espacio real para firma, QR y pie, moviéndola a la página siguiente
         # antes de dibujarla si hace falta. Nunca se corta una fila.
-        if (y + altura > 264) or (ultimo and y + altura + 88 > 282):
+        if (y + altura > 263) or (ultimo and y + altura + 75 > 276):
             y = cabecera_tabla(encabezado(continuacion=True))
         x = 10
         for i, (ancho, valor) in enumerate(zip(COLS, valores)):
@@ -587,7 +587,7 @@ def generar_pdf_estilo_solano(
             pdf.rect(x, y, ancho, altura)
             pdf.set_font("Arial", "B" if i in (0, 3) else "", 9.5)
             set_color(VERDE if i == 3 else (37, 49, 44))
-            pdf.set_xy(x + 2, y + 2)
+            pdf.set_xy(x + 2, y + 1.5)
             pdf.multi_cell(ancho - 4, 5.1, limpio(valor), align="C")
             x += ancho
         return y + altura
@@ -599,26 +599,26 @@ def generar_pdf_estilo_solano(
         for i, prod in enumerate(productos_detalle):
             y = fila(y, prod, i, ultimo=(i == len(productos_detalle) - 1))
 
-    # Reservar 18 mm después de la última fila, la firma, el QR (29 mm) y el pie (13 mm).
+    # Espaciado dinámico: firma y QR siguen la tabla sin posición fija.
     # El pie nunca invade la caja de autenticidad.
-    y = max(y + 18, 196 if pdf.page_no() == 1 else y + 18)
-    if y + 68 > 282:
+    y = y + 10
+    if y + 60 > 276:
         # En caso de datos generales extraordinariamente extensos,
         # se abre página nueva sin sobreponer contenido.
-        y = encabezado(continuacion=True) + 18
+        y = encabezado(continuacion=True) + 10
 
     pdf.set_draw_color(*VERDE_MEDIO)
-    pdf.line(50, y + 13, 160, y + 13)
-    texto_ajustado(10, y + 16, 190, asesor_nombre, 10.5, True, align="C")
-    texto_ajustado(10, y + 22, 190, asesor_ced, 9.5, align="C")
-    texto_ajustado(10, y + 27, 190, asesor_rfc, 9.5, align="C")
+    pdf.line(50, y + 10, 160, y + 10)
+    texto_ajustado(10, y + 13, 190, asesor_nombre, 10.5, True, align="C")
+    texto_ajustado(10, y + 19, 190, asesor_ced, 9.5, align="C")
+    texto_ajustado(10, y + 24, 190, asesor_rfc, 9.5, align="C")
 
     datos_qr = generar_sello_y_qr(
         num_factura=num_factura, cliente_nombre=cliente_nombre,
         huerta_nombre=huerta_nombre, fecha=fecha, productos_detalle=productos_detalle
     )
     sello_texto = sello_digital or datos_qr["sello"]
-    y_qr = y + 37
+    y_qr = y + 32
     pdf.set_draw_color(*VERDE_MEDIO)
     pdf.set_fill_color(248, 251, 248)
     pdf.rect(10, y_qr, 190, 29, style="DF")

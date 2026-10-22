@@ -635,7 +635,7 @@ def generar_pdf_estilo_solano(
     pdf.cell(150, 5, "VERIFICACIÓN Y AUTENTICIDAD DIGITAL - SOLANO AGROQUÍMICOS")
     usuario = getattr(st, "session_state", {}).get("usuario") or {}
     emisor = limpio(usuario.get("nombre", "Administrador Solano"))
-    texto_ajustado(44.7, y_qr + 9, 149, f"Emitido por: {emisor} | Fecha: {fecha_pdf}", 8)
+    texto_ajustado(44.7, y_qr + 9, 149, f"Emitido por: Q.F.B Jose Luis Infante Magaña | Fecha: {fecha_pdf}", 8)
     texto_ajustado(44.7, y_qr + 15, 149, f"Código de autenticidad: {sello_texto}", 8, True)
     texto_ajustado(44.7, y_qr + 21, 149, "Escanee el QR para consultar los datos de esta receta.", 7.5)
     # Detalle importante: el QR actual contiene información, no un enlace de consulta.

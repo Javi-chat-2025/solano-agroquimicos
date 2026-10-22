@@ -12,6 +12,7 @@ from supabase import create_client
 from fpdf import FPDF
 import extra_streamlit_components as stx
 import qrcode
+from streamlit_sortables import sort_items
 
 # ==========================================
 # CONFIGURACIÓN DE ZONA HORARIA (MÉXICO UTC-6)
@@ -611,6 +612,24 @@ def generar_pdf_estilo_solano(
 # EDICIÓN SEGURA: CREA UNA NUEVA VERSIÓN DE RECETA
 # Se conserva la receta original y su historial.
 # ==========================================
+def ordenar_productos_arrastrando(productos, clave, nombres=None):
+    """Ordena las filas completas, incluyendo dosis/unidad. Admite productos repetidos."""
+    if len(productos) < 2:
+        return
+    titulos = []
+    for i, item in enumerate(productos):
+        nombre = (nombres or {}).get(str(item.get("id_producto")), item.get("nombre_comercial", "Producto"))
+        # El índice hace inequívocas las opciones incluso con productos repetidos.
+        titulos.append(f"{i + 1}. {nombre}  ·  {item.get('dosis', '')} {item.get('unidad', '')}")
+    st.caption("☰ Mantén pulsado y arrastra los productos para elegir su orden.")
+    huella = hashlib.sha1("|".join(sorted(str(x.get("id_producto")) for x in productos)).encode("utf-8")).hexdigest()[:12]
+    orden = sort_items(titulos, direction="vertical", key=f"{clave}_{huella}")
+    if orden != titulos and len(orden) == len(titulos) and set(orden) == set(titulos):
+        referencias = {etiqueta: item for etiqueta, item in zip(titulos, productos)}
+        productos[:] = [referencias[etiqueta] for etiqueta in orden]
+        st.rerun()
+
+
 @st.dialog("✏️ Editar receta", width="large")
 def editar_receta(receta, cliente, huerta):
     id_original = receta["id_receta"]
@@ -633,7 +652,7 @@ def editar_receta(receta, cliente, huerta):
     # Cargar los productos originales una sola vez por apertura de la receta.
     if clave not in st.session_state:
         detalles = []
-        for d in receta.get("receta_detalles", []):
+        for d in sorted(receta.get("receta_detalles", []), key=lambda row: row.get("posicion") if row.get("posicion") is not None else 999999):
             producto = d.get("productos") or {}
             detalles.append({"id_producto": producto.get("id_producto"),
                              "dosis": str(d.get("dosis") or ""),
@@ -652,6 +671,9 @@ def editar_receta(receta, cliente, huerta):
     st.markdown("### 🧪 Lista de productos de la receta")
     if not editor["productos"]:
         st.warning("La receta no tiene productos. Agrega al menos uno antes de guardar.")
+
+    ordenar_productos_arrastrando(editor["productos"], f"arrastrar_editor_{id_original}",
+                                {str(k): v["nombre_comercial"] for k, v in por_id.items()})
 
     for i, d in enumerate(editor["productos"]):
         codigo = str(d["id_producto"])
@@ -737,7 +759,7 @@ def editar_receta(receta, cliente, huerta):
             if not res.data:
                 raise RuntimeError("No se recibió el identificador de la nueva receta")
             id_creado = res.data[0]["id_receta"]
-            datos = [dict(d, id_receta=id_creado) for d in detalle_nuevo]
+            datos = [dict(d, id_receta=id_creado, posicion=i + 1) for i, d in enumerate(detalle_nuevo)]
             supabase.table("receta_detalles").insert(datos).execute()
         except Exception as e:
             if id_creado is not None:
@@ -860,7 +882,7 @@ with tab_perfiles:
         try:
             res_recetas = supabase.table("recetas").select(
                 "id_receta, fecha, num_factura, objetivo, volumen_tanque, sello_digital, "
-                "receta_detalles(dosis, unidad, productos(id_producto, nombre_comercial, nombre_tecnico, uso))"
+                "receta_detalles(dosis, unidad, posicion, productos(id_producto, nombre_comercial, nombre_tecnico, uso))"
             ).eq("id_huerta", huerta["id_huerta"]).order("id_receta", desc=True).execute()
             recetas = res_recetas.data if res_recetas.data else []
         except Exception as e:
@@ -876,7 +898,7 @@ with tab_perfiles:
                 with st.container(border=True):
                     col_detalles, col_pdf = st.columns([3, 1])
                     
-                    detalles = r.get("receta_detalles", [])
+                    detalles = sorted(r.get("receta_detalles", []), key=lambda row: row.get("posicion") if row.get("posicion") is not None else 999999)
                     prods_pdf = []
                     
                     with col_detalles:
@@ -1019,33 +1041,17 @@ with tab_nueva_receta:
             st.write("---")
             st.markdown("### 📋 Resumen de Productos de la Receta")
             
-            col_h_id, col_h_com, col_h_tec, col_h_func, col_h_cant, col_h_del = st.columns(
-                [1.0, 2.5, 2.5, 2.0, 1.8, 0.7]
-            )
-            
-            with col_h_id: st.markdown("**ID**")
-            with col_h_com: st.markdown("**Nombre Comercial**")
-            with col_h_tec: st.markdown("**Ingrediente Activo**")
-            with col_h_func: st.markdown("**Familia - Grupo**")
-            with col_h_cant: st.markdown("**Dosis /2000**")
-            with col_h_del: st.markdown("**Acción**")
-            
-            st.divider()
-
+            ordenar_productos_arrastrando(st.session_state.productos_receta_temp, "arrastrar_receta_nueva")
             for idx, item in enumerate(st.session_state.productos_receta_temp):
-                c_id, c_com, c_tec, c_func, c_cant, c_del = st.columns(
-                    [1.0, 2.5, 2.5, 2.0, 1.8, 0.7]
-                )
-                
-                with c_id: st.write(f"`{item['id_producto']}`")
-                with c_com: st.write(item["nombre_comercial"])
-                with c_tec: st.write(item.get("nombre_tecnico") or "-")
-                with c_func: st.write(item.get("uso") or "-")
-                with c_cant: st.write(f"{item['dosis']} {item['unidad']}")
-                with c_del:
-                    if st.button("❌", key=f"del_prod_receta_{idx}"):
-                        st.session_state.productos_receta_temp.pop(idx)
-                        st.rerun()
+                with st.container(border=True):
+                    st.markdown(f"**{idx + 1}. [{item['id_producto']}] {item['nombre_comercial']}**")
+                    st.caption(f"🧬 Ingrediente activo: {item.get('nombre_tecnico') or '-'}  |  🧪 Familia - Grupo: {item.get('uso') or '-'}")
+                    st.write(f"💧 **Dosis / 2000 L:** {item['dosis']} {item['unidad']}")
+                    col_del = st.container()
+                    with col_del:
+                        if st.button("🗑️ Eliminar", key=f"del_prod_receta_{idx}", use_container_width=True):
+                            st.session_state.productos_receta_temp.pop(idx)
+                            st.rerun()
 
             st.write("")
             col_b1, col_b2 = st.columns([1, 4])
@@ -1078,11 +1084,12 @@ with tab_nueva_receta:
                             id_receta_creada = res_receta.data[0]["id_receta"]
                             
                             detalles_insert = [{
+                                "posicion": indice + 1,
                                 "id_receta": id_receta_creada,
                                 "id_producto": item["id_producto"],
                                 "dosis": item["dosis"],
                                 "unidad": item["unidad"]
-                            } for item in st.session_state.productos_receta_temp]
+                            } for indice, item in enumerate(st.session_state.productos_receta_temp)]
                             
                             supabase.table("receta_detalles").insert(detalles_insert).execute()
                             

@@ -374,7 +374,7 @@ with col_titulo_web:
     st.caption("Nutrición Especializada — Sistema de Gestión de Huertas y Recetas Agrícolas")
 
 with col_user:
-    st.write(f"👤 **{st.session_state.usuario.get('nombre', 'Usuario')}**")
+    st.write(f"👤 **Q.F.B Jose Luis Infante Magaña**")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
         try:
             cookie_manager.delete("solano_session", key="delete_solano_session")

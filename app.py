@@ -12,7 +12,7 @@ from supabase import create_client
 from fpdf import FPDF
 import extra_streamlit_components as stx
 import qrcode
-from streamlit_sortables import sort_items
+from streamlit_dnd import dnd, apply_move
 
 # ==========================================
 # CONFIGURACIÓN DE ZONA HORARIA (MÉXICO UTC-6)
@@ -613,23 +613,23 @@ def generar_pdf_estilo_solano(
 # Se conserva la receta original y su historial.
 # ==========================================
 def ordenar_productos_arrastrando(productos, clave, nombres=None):
-    """Ordena las filas completas, incluyendo dosis/unidad. Admite productos repetidos."""
+    """Ordena productos completos con streamlit-dnd, sin modificar sus dosis.
+
+    Cada hijo directo tiene key propia. El evento solo mueve elementos de la
+    lista existente: no toca Supabase hasta guardar la receta.
+    """
     if len(productos) < 2:
         return
-    titulos = []
-    for i, item in enumerate(productos):
-        nombre = (nombres or {}).get(str(item.get("id_producto")), item.get("nombre_comercial", "Producto"))
-        # El índice hace inequívocas las opciones incluso con productos repetidos.
-        titulos.append(f"{i + 1}. {nombre}  ·  {item.get('dosis', '')} {item.get('unidad', '')}")
-    st.caption("☰ Mantén pulsado y arrastra los productos para elegir su orden.")
-    # El componente conserva su estado interno entre ejecuciones de Streamlit.
-    # La clave debe variar si cambia el orden, la dosis o el contenido de la lista;
-    # de lo contrario, puede restaurar visualmente una lista anterior al arrastrar.
-    huella = hashlib.sha1(json.dumps(titulos, ensure_ascii=False).encode("utf-8")).hexdigest()[:12]
-    orden = sort_items(titulos, direction="vertical", key=f"{clave}_{huella}")
-    if orden != titulos and len(orden) == len(titulos) and set(orden) == set(titulos):
-        referencias = {etiqueta: item for etiqueta, item in zip(titulos, productos)}
-        productos[:] = [referencias[etiqueta] for etiqueta in orden]
+    st.caption("☰ Arrastra las tarjetas de esta lista para cambiar el orden de la receta.")
+    with st.container(key=clave):
+        for i, item in enumerate(productos):
+            nombre = (nombres or {}).get(str(item.get("id_producto")), item.get("nombre_comercial", "Producto"))
+            with st.container(key=f"{clave}_fila_{i}", border=True):
+                st.markdown(f"**☰ {i + 1}. {nombre}**")
+                st.caption(f"💧 Dosis: {item.get('dosis', '')} {item.get('unidad', '')}")
+    evento = dnd(clave, key=f"{clave}_dnd", cross=False, handle=True, handle_corner="top-right", indicator="line", color="#40916c")
+    if evento:
+        apply_move(evento, productos)
         st.rerun()
 
 
@@ -678,6 +678,7 @@ def editar_receta(receta, cliente, huerta):
     ordenar_productos_arrastrando(editor["productos"], f"arrastrar_editor_{id_original}",
                                 {str(k): v["nombre_comercial"] for k, v in por_id.items()})
 
+    st.caption("✏️ Para cambiar cantidades o eliminar productos, utiliza los controles siguientes.")
     for i, d in enumerate(editor["productos"]):
         codigo = str(d["id_producto"])
         producto = por_id.get(codigo)
@@ -1045,6 +1046,7 @@ with tab_nueva_receta:
             st.markdown("### 📋 Resumen de Productos de la Receta")
             
             ordenar_productos_arrastrando(st.session_state.productos_receta_temp, "arrastrar_receta_nueva")
+            st.caption("🗑️ Para eliminar productos, utiliza los controles siguientes.")
             for idx, item in enumerate(st.session_state.productos_receta_temp):
                 with st.container(border=True):
                     st.markdown(f"**{idx + 1}. [{item['id_producto']}] {item['nombre_comercial']}**")

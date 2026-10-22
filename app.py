@@ -547,7 +547,7 @@ def generar_pdf_estilo_solano(
         # Filas normales: hasta 265 mm. Para la ÚLTIMA fila reservamos
         # espacio real para firma, QR y pie, moviéndola a la página siguiente
         # antes de dibujarla si hace falta. Nunca se corta una fila.
-        if (y + altura > 264) or (ultimo and y + altura + 80 > 282):
+        if (y + altura > 264) or (ultimo and y + altura + 88 > 282):
             y = cabecera_tabla(encabezado(continuacion=True))
         x = 10
         for i, (ancho, valor) in enumerate(zip(COLS, valores)):
@@ -569,9 +569,9 @@ def generar_pdf_estilo_solano(
         for i, prod in enumerate(productos_detalle):
             y = fila(y, prod, i, ultimo=(i == len(productos_detalle) - 1))
 
-    # Reservar firma (~21 mm), separación y QR (29 mm) + pie (13 mm).
+    # Reservar 18 mm después de la última fila, la firma, el QR (29 mm) y el pie (13 mm).
     # El pie nunca invade la caja de autenticidad.
-    y = max(y + 10, 196 if pdf.page_no() == 1 else y + 10)
+    y = max(y + 18, 196 if pdf.page_no() == 1 else y + 18)
     if y + 68 > 282:
         # En caso de datos generales extraordinariamente extensos,
         # se abre página nueva sin sobreponer contenido.

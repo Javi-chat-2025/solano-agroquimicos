@@ -535,7 +535,7 @@ def generar_pdf_estilo_solano(
             set_color(BLANCO)
             pdf.set_xy(12, y + 2)
             pdf.multi_cell(35, 4.2, limpio(etiqueta), align="C")
-            texto_ajustado(52, y + 2.5, 145, valor, 10.5, True, align="C")
+            texto_ajustado(52, y + 2.5, 145, valor, 10.5, True, align="L")
             y += alto + 2
 
         y += 3

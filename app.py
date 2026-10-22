@@ -284,6 +284,21 @@ for key in ["cliente_sel", "huerta_sel", "producto_a_editar", "cliente_a_editar"
 if "productos_receta_temp" not in st.session_state:
     st.session_state.productos_receta_temp = []
 
+# Borrador de nueva receta: las claves permanecen entre reruns y pestañas.
+# No se guarda en Supabase hasta pulsar Guardar Receta.
+if st.session_state.pop("nueva_receta_reiniciar_pendiente", False):
+    for nombre in ("borrador_huerta", "borrador_fecha", "borrador_volumen",
+                   "borrador_objetivo", "borrador_producto", "borrador_dosis",
+                   "borrador_unidad"):
+        st.session_state.pop(nombre, None)
+
+if "borrador_volumen" not in st.session_state:
+    st.session_state.borrador_volumen = "2000 litros"
+if "borrador_objetivo" not in st.session_state:
+    st.session_state.borrador_objetivo = "Aplicación para defoliadores + control de hongos"
+if "borrador_dosis" not in st.session_state:
+    st.session_state.borrador_dosis = "1"
+
 # ==========================================
 # DIÁLOGOS DE CONFIRMACIÓN DE ELIMINACIÓN
 # ==========================================
@@ -585,6 +600,10 @@ def editar_receta(receta, cliente, huerta):
     id_original = receta["id_receta"]
     clave = f"editor_receta_{id_original}"
     st.info(f"Receta #{id_original}. Al guardar, se creará una nueva versión en esta huerta y se conservará la anterior.")
+    if st.button("✖️ Cerrar editor", key=f"{clave}_cerrar"):
+        st.session_state.pop(clave, None)
+        st.session_state.pop("receta_editor_activa", None)
+        st.rerun()
 
     try:
         catalogo = supabase.table("productos").select("id_producto,nombre_comercial,nombre_tecnico,uso").execute().data or []
@@ -714,6 +733,7 @@ def editar_receta(receta, cliente, huerta):
             st.error(f"No se pudo guardar la nueva versión: {e}")
             return
         st.session_state.pop(clave, None)
+        st.session_state.pop("receta_editor_activa", None)
         st.session_state["receta_ultima_editada"] = id_creado
         st.rerun()
 
@@ -887,7 +907,17 @@ with tab_perfiles:
                             type="primary"
                         )
                         if st.button("✏️ Editar receta", key=f"editar_receta_{r['id_receta']}"):
-                            editar_receta(r, cliente, huerta)
+                            st.session_state["receta_editor_activa"] = r["id_receta"]
+
+            # El diálogo debe llamarse en CADA ejecución mientras haya una receta activa.
+            # De lo contrario, st.rerun() lo cerraría al agregar, editar o quitar productos.
+            id_activo = st.session_state.get("receta_editor_activa")
+            if id_activo is not None:
+                receta_activa = next((r for r in recetas if str(r["id_receta"]) == str(id_activo)), None)
+                if receta_activa is not None:
+                    editar_receta(receta_activa, cliente, huerta)
+                else:
+                    st.session_state.pop("receta_editor_activa", None)
 
 # ==========================================
 # PESTAÑA 2: EMITIR NUEVA RECETA
@@ -913,7 +943,10 @@ with tab_nueva_receta:
         
         with col_c1:
             st.markdown("### 1. Datos Generales")
-            huerta_sel_key = st.selectbox("🌳 Seleccionar huerta *", list(dict_huertas.keys()))
+            opciones_huertas = list(dict_huertas.keys())
+            if st.session_state.get("borrador_huerta") not in opciones_huertas:
+                st.session_state.borrador_huerta = opciones_huertas[0]
+            huerta_sel_key = st.selectbox("🌳 Seleccionar huerta *", opciones_huertas, key="borrador_huerta")
             huerta_info = dict_huertas[huerta_sel_key]
             
             cliente_info = huerta_info.get("clientes") or {}
@@ -925,23 +958,26 @@ with tab_nueva_receta:
                 f"📍 **Ubicación:** {huerta_info.get('ubicacion') or 'Sin ubicación'}"
             )
             
-            fecha_receta_dt = st.date_input("📅 Fecha de receta", value=obtener_datetime_local(), format="DD/MM/YYYY")
+            fecha_receta_dt = st.date_input("📅 Fecha de receta", value=obtener_datetime_local().date(), format="DD/MM/YYYY", key="borrador_fecha")
             fecha_receta = fecha_receta_dt.strftime("%d/%m/%Y")
             
             num_factura_autoincrementado = obtener_siguiente_num_factura()
-            volumen_tanque = st.text_input("🛢️ Volumen del tanque", value="2000 litros")
-            objetivo_aplicacion = st.text_input("🎯 Objetivo de la aplicación", value="Aplicación para defoliadores + control de hongos")
+            volumen_tanque = st.text_input("🛢️ Volumen del tanque", key="borrador_volumen")
+            objetivo_aplicacion = st.text_input("🎯 Objetivo de la aplicación", key="borrador_objetivo")
             
         with col_c2:
             st.markdown("### 2. Agregar Productos")
-            prod_sel_nombre = st.selectbox("🧪 Seleccionar producto *", list(dict_prods.keys()))
+            opciones_productos = list(dict_prods.keys())
+            if st.session_state.get("borrador_producto") not in opciones_productos:
+                st.session_state.borrador_producto = opciones_productos[0]
+            prod_sel_nombre = st.selectbox("🧪 Seleccionar producto *", opciones_productos, key="borrador_producto")
             prod_info = dict_prods[prod_sel_nombre]
             
             col_d1, col_d2 = st.columns(2)
             with col_d1:
-                dosis_val = st.text_input("💧 Cantidad / dosis", value="1")
+                dosis_val = st.text_input("💧 Cantidad / dosis", key="borrador_dosis")
             with col_d2:
-                unidad_val = st.selectbox("📏 Unidad", ["ml","lt", "gr", "kg"," ml / Ha", "lt / Ha", "gr / Ha","kg / Ha","ml / 2000 lt","lt / 2000 lt","gr / 2000 lt","kg / 2000 lt"])
+                unidad_val = st.selectbox("📏 Unidad", ["ml","lt", "gr", "kg"," ml / Ha", "lt / Ha", "gr / Ha","kg / Ha","ml / 2000 lt","lt / 2000 lt","gr / 2000 lt","kg / 2000 lt"], key="borrador_unidad")
                 
             if st.button("➕ Añadir Producto"):
                 st.session_state.productos_receta_temp.append({
@@ -1042,6 +1078,8 @@ with tab_nueva_receta:
                             )
                             
                             st.session_state.productos_receta_temp = []
+                            # Reiniciar campos únicamente cuando finalizó el guardado.
+                            st.session_state.nueva_receta_reiniciar_pendiente = True
                             st.success(f"¡Receta #{id_receta_creada} guardada con éxito!")
                             
                             st.download_button(

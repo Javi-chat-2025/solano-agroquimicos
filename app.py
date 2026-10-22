@@ -764,7 +764,7 @@ with tab_nueva_receta:
         dict_huertas = {f"{h['nombre_huerta']} ({h['clientes']['nombre'] if h.get('clientes') else 'Sin cliente'})": h for h in huertas_data}
         dict_prods = {f"[{p['id_producto']}] {p['nombre_comercial']}": p for p in productos_data}
         
-        col_c1, col_c2 = st.columns(2)
+        col_c1, col_c2 = st.container(), st.container()
         
         with col_c1:
             st.markdown("### 1. Datos Generales")
@@ -915,7 +915,7 @@ with tab_visitas:
     st.subheader("📅 Gestión de Visitas Técnicas")
     st.caption("Agenda citas para prospección o seguimiento en campo y sincronízalas con el calendario de tu celular.")
 
-    col_form_v, col_hist_v = st.columns([1.3, 2.7])
+    col_form_v, col_hist_v = st.container(), st.container()
 
     with col_form_v:
         st.markdown("### ➕ Agendar Nueva Visita")
@@ -1041,7 +1041,7 @@ with tab_registro:
     sub_tab_cli, sub_tab_hue = st.tabs(["👤 Clientes", "🌳 Huertas"])
     
     with sub_tab_cli:
-        col_f_cli, col_t_cli = st.columns([1.2, 2.8])
+        col_f_cli, col_t_cli = st.container(), st.container()
         
         with col_f_cli:
             cli_edit = st.session_state.cliente_a_editar
@@ -1130,7 +1130,7 @@ with tab_registro:
                                 confirmar_eliminar_cliente(c)
 
     with sub_tab_hue:
-        col_f_hue, col_t_hue = st.columns([1.2, 2.8])
+        col_f_hue, col_t_hue = st.container(), st.container()
         
         try:
             res_cli_select = supabase.table("clientes").select("id_cliente, nombre").execute()
@@ -1248,7 +1248,7 @@ with tab_productos:
     st.subheader("🧪 Catálogo de Productos Agroquímicos")
     
     with st.expander("📥 Importar o Actualizar Productos mediante Excel / CSV", expanded=False):
-        col_ex1, col_ex2 = st.columns([2, 1])
+        col_ex1, col_ex2 = st.container(), st.container()
         
         with col_ex1:
             st.markdown("##### Subir archivo de Excel")
@@ -1332,7 +1332,7 @@ with tab_productos:
 
     st.write("---")
 
-    col_f_prod, col_t_prod = st.columns([1.2, 2.8])
+    col_f_prod, col_t_prod = st.container(), st.container()
     
     with col_f_prod:
         prod_edit = st.session_state.producto_a_editar

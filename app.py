@@ -622,7 +622,10 @@ def ordenar_productos_arrastrando(productos, clave, nombres=None):
         # El índice hace inequívocas las opciones incluso con productos repetidos.
         titulos.append(f"{i + 1}. {nombre}  ·  {item.get('dosis', '')} {item.get('unidad', '')}")
     st.caption("☰ Mantén pulsado y arrastra los productos para elegir su orden.")
-    huella = hashlib.sha1("|".join(sorted(str(x.get("id_producto")) for x in productos)).encode("utf-8")).hexdigest()[:12]
+    # El componente conserva su estado interno entre ejecuciones de Streamlit.
+    # La clave debe variar si cambia el orden, la dosis o el contenido de la lista;
+    # de lo contrario, puede restaurar visualmente una lista anterior al arrastrar.
+    huella = hashlib.sha1(json.dumps(titulos, ensure_ascii=False).encode("utf-8")).hexdigest()[:12]
     orden = sort_items(titulos, direction="vertical", key=f"{clave}_{huella}")
     if orden != titulos and len(orden) == len(titulos) and set(orden) == set(titulos):
         referencias = {etiqueta: item for etiqueta, item in zip(titulos, productos)}

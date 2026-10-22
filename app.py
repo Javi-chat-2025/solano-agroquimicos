@@ -412,183 +412,194 @@ def generar_pdf_estilo_solano(
     sello_digital=None,
     logo_path="logo.png"
 ):
-    if productos_detalle is None:
-        productos_detalle = []
-    if not fecha:
-        fecha = obtener_fecha_actual()
-        
-    pdf = FPDF()
-    pdf.add_page()
+    """Receta A4 rediseñada. Mantiene el logotipo original y los datos guardados."""
+    productos_detalle = productos_detalle or []
+    fecha = fecha or obtener_fecha_actual()
+    pdf = FPDF(format="A4")
     pdf.set_auto_page_break(auto=False)
-    
-    # Encabezado
-    if os.path.exists(logo_path):
-        pdf.image(logo_path, x=10, y=8, w=22)
-    
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_text_color(40, 40, 40)
-    pdf.set_xy(10, 8)
-    pdf.cell(190, 6, "RECETA DE APLICACIÓN", align="C", ln=True)
-    
-    x_empresa = 35 if os.path.exists(logo_path) else 10
-    pdf.set_font("Helvetica", "B", 8.5)
-    pdf.set_text_color(120, 120, 120)
-    pdf.text(x_empresa, 18, empresa)
-    pdf.set_font("Helvetica", "", 7.5)
-    pdf.text(x_empresa, 22, subtitulo)
-    
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_text_color(40, 40, 40)
-    pdf.text(145, 20, f"FECHA: {fecha}")
-    
-    pdf.set_draw_color(210, 210, 210)
-    pdf.line(10, 28, 200, 28)
-    
-    # Datos Cliente / Huerta
-    pdf.set_xy(10, 31)
-    pdf.set_font("Helvetica", "B", 7.5)
-    pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 4, "RECETAR A:", ln=True)
-    
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_text_color(255, 255, 255)
-    
-    pdf.set_fill_color(0, 150, 214)
-    pdf.cell(190, 5, f"  Cliente: {cliente_nombre}", fill=True, ln=True)
-    
-    pdf.set_fill_color(46, 160, 67)
-    pdf.cell(190, 5, f"  Nombre de la Huerta: {huerta_nombre}", fill=True, ln=True)
-    
-    if huerta_ubicacion:
-        pdf.set_fill_color(35, 130, 55)
-        pdf.cell(190, 5, f"  Ubicación: {huerta_ubicacion}", fill=True, ln=True)
-        
-    # Objetivo
-    pdf.ln(3)
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_text_color(40, 40, 40)
-    pdf.cell(190, 4, "OBJETIVO DE LA APLICACIÓN", align="C", ln=True)
-    
-    pdf.set_fill_color(250, 235, 70)
-    pdf.set_font("Helvetica", "I", 7.5)
-    pdf.cell(190, 5.5, f"{objetivo}", fill=True, align="C", ln=True)
-    
-    pdf.ln(4)
-    
-    # Tabla
-    w_id = 20
-    w_com = 45
-    w_tec = 65
-    w_func = 35
-    w_cant = 25
-    
-    pdf.set_fill_color(140, 30, 130)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 7.5)
-    
-    pdf.cell(w_id, 6, "Id Prod", fill=True, align="C")
-    pdf.cell(w_com, 6, "Nombre Comercial", fill=True, align="C")
-    pdf.cell(w_tec, 6, "Ingrediente Activo", fill=True, align="C")
-    pdf.cell(w_func, 6, "Familia - Grupo", fill=True, align="C")
-    pdf.cell(w_cant, 6, "Dosis / 2000 L", fill=True, align="C", ln=True)
-    
-    pdf.set_font("Helvetica", "", 7)
-    pdf.set_draw_color(220, 220, 220)
-    
-    h_linea = 4.0
-    
-    for prod in productos_detalle:
-        pdf.set_text_color(40, 40, 40)
-        
-        str_id = str(prod.get("id_producto", ""))
-        str_com = str(prod.get("nombre_comercial", ""))
-        str_tec = str(prod.get("nombre_tecnico", ""))
-        str_func = str(prod.get("uso", ""))
-        str_cant = f"{prod.get('dosis', '')} {prod.get('unidad', '')}"
-        
-        num_lineas_com = len(pdf.multi_cell(w_com, h_linea, str_com, dry_run=True, output="LINES"))
-        num_lineas_tec = len(pdf.multi_cell(w_tec, h_linea, str_tec, dry_run=True, output="LINES"))
-        num_lineas_func = len(pdf.multi_cell(w_func, h_linea, str_func, dry_run=True, output="LINES"))
-        
-        max_lineas = max(1, num_lineas_com, num_lineas_tec, num_lineas_func)
-        row_h = max_lineas * h_linea + 2
-        
-        y_pos = pdf.get_y()
-        
-        pdf.rect(10, y_pos, w_id, row_h)
-        pdf.rect(10 + w_id, y_pos, w_com, row_h)
-        pdf.rect(10 + w_id + w_com, y_pos, w_tec, row_h)
-        pdf.rect(10 + w_id + w_com + w_tec, y_pos, w_func, row_h)
-        
-        pdf.set_fill_color(250, 235, 70)
-        pdf.rect(10 + w_id + w_com + w_tec + w_func, y_pos, w_cant, row_h, style='DF')
-        
-        pdf.set_xy(10, y_pos + (row_h - h_linea)/2)
-        pdf.multi_cell(w_id, h_linea, str_id, border=0, align="C")
-        
-        pdf.set_xy(10 + w_id, y_pos + 1)
-        pdf.multi_cell(w_com, h_linea, str_com, border=0, align="C")
-        
-        pdf.set_xy(10 + w_id + w_com, y_pos + 1)
-        pdf.multi_cell(w_tec, h_linea, str_tec, border=0, align="C")
-        
-        pdf.set_xy(10 + w_id + w_com + w_tec, y_pos + 1)
-        pdf.multi_cell(w_func, h_linea, str_func, border=0, align="C")
-        
-        pdf.set_xy(10 + w_id + w_com + w_tec + w_func, y_pos + (row_h - h_linea)/2)
-        pdf.multi_cell(w_cant, h_linea, str_cant, border=0, align="C")
-        
-        pdf.set_y(y_pos + row_h)
+    VERDE = (27, 67, 50)
+    VERDE_MEDIO = (45, 106, 79)
+    AMARILLO = (255, 244, 184)
+    GRIS = (92, 105, 112)
+    BLANCO = (255, 255, 255)
+    ANCHO = 190
+    COLS = [52, 58, 45, 35]  # 190 mm; cuatro columnas aprobadas
 
-    # Asesor
-    pdf.set_y(230)
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_text_color(40, 40, 40)
-    pdf.cell(190, 3.5, asesor_nombre, align="C", ln=True)
-    pdf.set_font("Helvetica", "", 7)
-    pdf.cell(190, 3, asesor_ced, align="C", ln=True)
-    pdf.cell(190, 3, asesor_rfc, align="C", ln=True)
-    
-    # Sello / QR
+    def limpio(valor):
+        """Normaliza caracteres para las fuentes Helvetica integradas en FPDF."""
+        texto = str(valor if valor is not None else "")
+        return texto.replace("\u2022", "-").replace("\u2014", "-").replace("\u2013", "-").replace("\u2705", "")
+
+    def set_color(color):
+        pdf.set_text_color(*color)
+
+    def texto_ajustado(x, y, ancho, valor, size=10, bold=False, max_height=30, align="L"):
+        pdf.set_font("Helvetica", "B" if bold else "", size)
+        set_color(VERDE if bold else (36, 49, 54))
+        pdf.set_xy(x, y)
+        pdf.multi_cell(ancho, 5.1, limpio(valor), border=0, align=align)
+        return min(pdf.get_y() - y, max_height)
+
+    def lineas(valor, ancho, size=10, bold=False):
+        pdf.set_font("Helvetica", "B" if bold else "", size)
+        return pdf.multi_cell(ancho - 4, 5.1, limpio(valor), dry_run=True, output="LINES")
+
+    def encabezado(continuacion=False):
+        pdf.add_page()
+        pdf.set_fill_color(*VERDE)
+        pdf.rect(0, 0, 210, 4, style="F")
+        if os.path.exists(logo_path):
+            # Usa el logo real del proyecto, conservando su proporción.
+            try:
+                pdf.image(logo_path, x=10, y=10, w=27, h=24, keep_aspect_ratio=True)
+            except Exception:
+                pass
+        x_brand = 42 if os.path.exists(logo_path) else 11
+        pdf.set_font("Helvetica", "B", 13)
+        set_color(VERDE)
+        pdf.set_xy(x_brand, 13)
+        pdf.cell(112, 7, limpio(empresa))
+        pdf.set_font("Helvetica", "", 9)
+        set_color(GRIS)
+        pdf.set_xy(x_brand, 21)
+        pdf.cell(105, 5, limpio(subtitulo))
+        pdf.set_draw_color(235, 185, 32)
+        pdf.set_line_width(0.7)
+        pdf.line(x_brand, 27.5, min(154, x_brand + 98), 27.5)
+        pdf.set_font("Helvetica", "B", 9.5)
+        set_color(VERDE)
+        pdf.set_xy(153, 14)
+        pdf.cell(47, 6, f"FECHA: {limpio(fecha)}", align="R")
+        pdf.set_font("Helvetica", "B", 17)
+        set_color(VERDE)
+        pdf.set_xy(10, 39)
+        pdf.cell(190, 9, "RECETA DE APLICACIÓN", align="C")
+        pdf.set_font("Helvetica", "", 9)
+        set_color(GRIS)
+        pdf.set_xy(10, 49)
+        pdf.cell(190, 5, f"Folio: {limpio(num_factura)}" + ("  |  Continuación" if continuacion else ""), align="C")
+        if continuacion:
+            return 61
+
+        # Datos del productor. En renglones separados, para permitir nombres extensos.
+        y = 59
+        for etiqueta, valor in (
+            ("CLIENTE", cliente_nombre),
+            ("NOMBRE DE LA HUERTA", huerta_nombre),
+            ("UBICACIÓN", huerta_ubicacion or "Sin ubicación"),
+        ):
+            n = len(lineas(valor, 188, 10.5, True))
+            alto = max(11.5, 5.1 * n + 5)
+            pdf.set_fill_color(237, 247, 238)
+            pdf.rect(10, y, 190, alto, style="F")
+            pdf.set_fill_color(*VERDE)
+            pdf.rect(10, y, 39, alto, style="F")
+            pdf.set_font("Helvetica", "B", 8)
+            set_color(BLANCO)
+            pdf.set_xy(12, y + 2)
+            pdf.multi_cell(35, 4.2, limpio(etiqueta), align="L")
+            texto_ajustado(52, y + 2.5, 145, valor, 10.5, True)
+            y += alto + 2
+
+        y += 3
+        objetivo_lineas = len(lineas(objetivo, 186, 10.5))
+        alto_objetivo = max(17, 5.1 * objetivo_lineas + 12)
+        pdf.set_fill_color(247, 205, 66)
+        pdf.rect(10, y, 190, 7, style="F")
+        pdf.set_font("Helvetica", "B", 10)
+        set_color(VERDE)
+        pdf.set_xy(13, y + 1)
+        pdf.cell(184, 5, "OBJETIVO DE LA APLICACIÓN")
+        pdf.set_fill_color(255, 250, 231)
+        pdf.rect(10, y + 7, 190, alto_objetivo - 7, style="F")
+        texto_ajustado(13, y + 9, 184, objetivo, 10.5)
+        y += alto_objetivo + 7
+        pdf.set_font("Helvetica", "", 9)
+        set_color(GRIS)
+        pdf.set_xy(10, y)
+        pdf.cell(190, 5, f"Volumen del tanque: {limpio(volumen_tanque)}")
+        return y + 10
+
+    def cabecera_tabla(y):
+        pdf.set_fill_color(*VERDE)
+        pdf.rect(10, y, ANCHO, 12, style="F")
+        x = 10
+        for ancho, nombre in zip(COLS, ["Nombre Comercial", "Ingrediente Activo", "Familia - Grupo", "Dosis / 2000 L"]):
+            pdf.set_font("Helvetica", "B", 9.2)
+            set_color(BLANCO)
+            pdf.set_xy(x + 1, y + 3)
+            pdf.multi_cell(ancho - 2, 5.4, nombre, align="C")
+            x += ancho
+        return y + 12
+
+    def fila(y, prod, indice):
+        valores = [
+            prod.get("nombre_comercial", ""),
+            prod.get("nombre_tecnico", ""),
+            prod.get("uso", ""),
+            (f"{prod.get('dosis', '')} {prod.get('unidad', '')}").strip(),
+        ]
+        alturas = [len(lineas(valor, col, 9.5, idx in (0, 3))) for idx, (valor, col) in enumerate(zip(valores, COLS))]
+        altura = max(12, max(alturas) * 5.1 + 5)
+        # Reservar espacio para sección de firma/verificación al final; páginas nuevas automáticas.
+        if y + altura > 222:
+            y = cabecera_tabla(encabezado(continuacion=True))
+        x = 10
+        for i, (ancho, valor) in enumerate(zip(COLS, valores)):
+            pdf.set_fill_color(*(AMARILLO if i == 3 else ((255, 255, 255) if indice % 2 else (247, 250, 248))))
+            pdf.rect(x, y, ancho, altura, style="F")
+            pdf.set_draw_color(214, 224, 216)
+            pdf.rect(x, y, ancho, altura)
+            pdf.set_font("Helvetica", "B" if i in (0, 3) else "", 9.5)
+            set_color(VERDE if i == 3 else (37, 49, 44))
+            pdf.set_xy(x + 2, y + 2)
+            pdf.multi_cell(ancho - 4, 5.1, limpio(valor), align="C" if i == 3 else "L")
+            x += ancho
+        return y + altura
+
+    y = cabecera_tabla(encabezado())
+    if not productos_detalle:
+        y = fila(y, {"nombre_comercial": "Sin productos registrados"}, 0)
+    else:
+        for i, prod in enumerate(productos_detalle):
+            y = fila(y, prod, i)
+
+    # Nunca encimar asesor ni verificación con la tabla.
+    if y + 64 > 282:
+        encabezado(continuacion=True)
+        y = 65
+    y = max(y + 9, 225 if pdf.page_no() == 1 else y + 9)
+    if y + 55 > 289:
+        encabezado(continuacion=True)
+        y = 68
+
+    pdf.set_draw_color(*VERDE_MEDIO)
+    pdf.line(50, y, 160, y)
+    texto_ajustado(10, y + 3, 190, asesor_nombre, 10.5, True, align="C")
+    texto_ajustado(10, y + 9, 190, asesor_ced, 9.5, align="C")
+    texto_ajustado(10, y + 14, 190, asesor_rfc, 9.5, align="C")
+
     datos_qr = generar_sello_y_qr(
-        num_factura=num_factura,
-        cliente_nombre=cliente_nombre,
-        huerta_nombre=huerta_nombre,
-        fecha=fecha,
-        productos_detalle=productos_detalle
+        num_factura=num_factura, cliente_nombre=cliente_nombre,
+        huerta_nombre=huerta_nombre, fecha=fecha, productos_detalle=productos_detalle
     )
-    
-    sello_texto = sello_digital if sello_digital else datos_qr["sello"]
-    
-    y_sello = 250
-    
-    pdf.set_fill_color(248, 249, 250)
-    pdf.set_draw_color(200, 210, 220)
-    pdf.rect(10, y_sello, 190, 24, style='DF')
-    
+    sello_texto = sello_digital or datos_qr["sello"]
+    y_qr = y + 25
+    pdf.set_draw_color(*VERDE_MEDIO)
+    pdf.set_fill_color(248, 251, 248)
+    pdf.rect(10, y_qr, 190, 29, style="DF")
     datos_qr["qr_bytes"].seek(0)
-    pdf.image(datos_qr["qr_bytes"], x=12, y=y_sello + 2, w=20, h=20, title="QR Code")
-    
-    pdf.set_xy(35, y_sello + 2.5)
-    pdf.set_font("Helvetica", "B", 7.5)
-    pdf.set_text_color(27, 67, 50)
-    pdf.cell(0, 3.5, "VERIFICACIÓN Y AUTENTICIDAD DIGITAL - SOLANO AGROQUÍMICOS", ln=True)
-    
-    pdf.set_xy(35, y_sello + 7)
-    pdf.set_font("Helvetica", "", 7)
-    pdf.set_text_color(60, 60, 60)
-    pdf.cell(0, 3.5, f"Emitido por: {st.session_state.usuario.get('nombre', 'Administrador Solano')} | Fecha: {datos_qr['fecha_hora']}", ln=True)
-    
-    pdf.set_xy(35, y_sello + 11.5)
-    pdf.set_font("Courier", "B", 7.5)
-    pdf.set_text_color(20, 20, 20)
-    pdf.cell(0, 3.5, f"Código de Autenticidad: {sello_texto}", ln=True)
-    
-    pdf.set_xy(35, y_sello + 16)
-    pdf.set_font("Helvetica", "I", 6)
-    pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 3.5, "Escanee el código QR para validar este documento oficialmente en el sistema.", ln=True)
-    
+    pdf.image(datos_qr["qr_bytes"], x=13, y=y_qr + 2.5, w=24, h=24)
+    pdf.set_font("Helvetica", "B", 8.2)
+    set_color(VERDE)
+    pdf.set_xy(42, y_qr + 3)
+    pdf.cell(155, 5, "VERIFICACIÓN Y AUTENTICIDAD DIGITAL - SOLANO AGROQUÍMICOS")
+    usuario = getattr(st, "session_state", {}).get("usuario") or {}
+    emisor = limpio(usuario.get("nombre", "Administrador Solano"))
+    texto_ajustado(42, y_qr + 9, 154, f"Emitido por: {emisor} | Fecha: {datos_qr['fecha_hora']}", 8)
+    texto_ajustado(42, y_qr + 15, 154, f"Código de autenticidad: {sello_texto}", 8, True)
+    texto_ajustado(42, y_qr + 21, 154, "Escanee el QR para consultar los datos de esta receta.", 7.5)
+    # Detalle importante: el QR actual contiene información, no un enlace de consulta.
     return pdf.output()
 
 # ==========================================

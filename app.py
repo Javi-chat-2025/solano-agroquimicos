@@ -737,6 +737,13 @@ def editar_receta(receta, cliente, huerta):
         st.session_state["receta_ultima_editada"] = id_creado
         st.rerun()
 
+# Cierra cualquier editor de una receta anterior al trabajar con una receta nueva.
+# Solo limpia el estado del editor; no toca productos_receta_temp ni el borrador.
+def cerrar_editor_anterior():
+    id_anterior = st.session_state.pop("receta_editor_activa", None)
+    if id_anterior is not None:
+        st.session_state.pop(f"editor_receta_{id_anterior}", None)
+
 # ==========================================
 # PESTAÑA 1: EXPLORADOR POR PERFILES
 # ==========================================
@@ -904,7 +911,8 @@ with tab_perfiles:
                             file_name=f"Receta_{r['id_receta']}_{huerta['nombre_huerta']}.pdf",
                             mime="application/pdf",
                             key=f"dl_pdf_{r['id_receta']}",
-                            type="primary"
+                            type="primary",
+                            on_click=cerrar_editor_anterior
                         )
                         if st.button("✏️ Editar receta", key=f"editar_receta_{r['id_receta']}"):
                             st.session_state["receta_editor_activa"] = r["id_receta"]
@@ -979,7 +987,7 @@ with tab_nueva_receta:
             with col_d2:
                 unidad_val = st.selectbox("📏 Unidad", ["ml","lt", "gr", "kg"," ml / Ha", "lt / Ha", "gr / Ha","kg / Ha","ml / 2000 lt","lt / 2000 lt","gr / 2000 lt","kg / 2000 lt"], key="borrador_unidad")
                 
-            if st.button("➕ Añadir Producto"):
+            if st.button("➕ Añadir Producto", on_click=cerrar_editor_anterior):
                 st.session_state.productos_receta_temp.append({
                     "id_producto": prod_info["id_producto"],
                     "nombre_comercial": prod_info["nombre_comercial"],
@@ -1031,7 +1039,7 @@ with tab_nueva_receta:
                     st.rerun()
                     
             with col_b2:
-                if st.button("💾 Guardar Receta y Generar PDF", type="primary"):
+                if st.button("💾 Guardar Receta y Generar PDF", type="primary", on_click=cerrar_editor_anterior):
                     try:
                         sello_info = generar_sello_y_qr(
                             num_factura=num_factura_autoincrementado,
@@ -1086,7 +1094,8 @@ with tab_nueva_receta:
                                 label="📄 Descargar PDF Con QR y Sello Digital",
                                 data=bytes(pdf_bytes),
                                 file_name=f"Receta_{id_receta_creada}_{huerta_info['nombre_huerta']}.pdf",
-                                mime="application/pdf"
+                                mime="application/pdf",
+                                on_click=cerrar_editor_anterior
                             )
                     except Exception as e:
                         st.error(f"Error al guardar la receta: {e}")

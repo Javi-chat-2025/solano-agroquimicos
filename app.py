@@ -448,23 +448,24 @@ def generar_pdf_estilo_solano(
     class PDFReceta(FPDF):
         def footer(self):
             # Pie presente en todas las páginas, también en continuaciones.
-            self.set_y(-13)
+            self.set_y(-12.7)
             self.set_draw_color(215, 226, 216)
-            self.line(10, self.get_y(), 200, self.get_y())
+            self.line(12.7, self.get_y(), 197.3, self.get_y())
             self.set_font("Arial", "", 8.5)
             self.set_text_color(92, 105, 112)
             self.cell(0, 8, f"Página {self.page_no()} de {{nb}}", align="C")
 
     pdf = PDFReceta(format="A4")
     pdf.alias_nb_pages()
+    pdf.set_margins(12.7, 12.7, 12.7)  # 1.27 cm exactos, izquierda / arriba / derecha
     pdf.set_auto_page_break(auto=False)
     VERDE = (27, 67, 50)
     VERDE_MEDIO = (45, 106, 79)
     AMARILLO = (255, 244, 184)
     GRIS = (92, 105, 112)
     BLANCO = (255, 255, 255)
-    ANCHO = 190
-    COLS = [52, 58, 45, 35]  # 190 mm; cuatro columnas aprobadas
+    ANCHO = 184.6  # A4: 210 - 12.7 mm por cada lado
+    COLS = [50.5, 56.3, 43.8, 34.0]  # Total 184.6 mm; cuatro columnas aprobadas
 
     def limpio(valor):
         """Normaliza caracteres para las fuentes Arial compatibles integradas en FPDF."""
@@ -492,71 +493,71 @@ def generar_pdf_estilo_solano(
         if os.path.exists(logo_path):
             # Usa el logo real del proyecto, conservando su proporción.
             try:
-                pdf.image(logo_path, x=10, y=10, w=27, h=24, keep_aspect_ratio=True)
+                pdf.image(logo_path, x=12.7, y=12.7, w=27, h=24, keep_aspect_ratio=True)
             except Exception:
                 pass
-        x_brand = 42 if os.path.exists(logo_path) else 11
+        x_brand = 43 if os.path.exists(logo_path) else 12.7
         pdf.set_font("Arial", "B", 13)
         set_color(VERDE)
-        pdf.set_xy(x_brand, 13)
+        pdf.set_xy(x_brand, 15.7)
         pdf.cell(106, 7, limpio(empresa), align="C")
         pdf.set_font("Arial", "", 9)
         set_color(GRIS)
-        pdf.set_xy(x_brand, 21)
+        pdf.set_xy(x_brand, 23.7)
         pdf.cell(106, 5, limpio(subtitulo), align="C")
         pdf.set_draw_color(235, 185, 32)
         pdf.set_line_width(0.7)
-        pdf.line(x_brand + 4, 27.5, x_brand + 102, 27.5)
+        pdf.line(x_brand + 4, 30.2, x_brand + 102, 30.2)
         pdf.set_font("Arial", "B", 9.5)
         set_color(VERDE)
-        pdf.set_xy(144, 14)
+        pdf.set_xy(141.3, 16.7)
         pdf.cell(56, 6, f"FECHA: {limpio(fecha_pdf)}", align="R")
         pdf.set_font("Arial", "B", 17)
         set_color(VERDE)
-        pdf.set_xy(10, 35)
-        pdf.cell(190, 9, "RECETA DE APLICACIÓN", align="C")
+        pdf.set_xy(12.7, 37.7)
+        pdf.cell(184.6, 9, "RECETA DE APLICACIÓN", align="C")
         if continuacion:
-            return 52
+            return 54.7
 
         # Datos del productor. En renglones separados, para permitir nombres extensos.
-        y = 49
+        y = 51.7
         for etiqueta, valor in (
             ("CLIENTE", cliente_nombre),
             ("NOMBRE DE LA HUERTA", huerta_nombre),
             ("UBICACIÓN", huerta_ubicacion or "Sin ubicación"),
         ):
-            n = len(lineas(valor, 141, 10.5, True))
+            n = len(lineas(valor, 136, 10.5, True))
             alto = max(9.2, 5.1 * n + 2.5)
             pdf.set_fill_color(237, 247, 238)
-            pdf.rect(10, y, 190, alto, style="F")
+            pdf.rect(12.7, y, 184.6, alto, style="F")
             pdf.set_fill_color(*VERDE)
-            pdf.rect(10, y, 39, alto, style="F")
+            pdf.rect(12.7, y, 39, alto, style="F")
             pdf.set_font("Arial", "B", 8)
             set_color(BLANCO)
-            pdf.set_xy(12, y + 1)
+            pdf.set_xy(14.7, y + 1)
             pdf.multi_cell(35, 4.2, limpio(etiqueta), align="C")
-            texto_ajustado(52, y + 1, 145, valor, 10.5, True, align="L")
+            texto_ajustado(54.7, y + 1, 139.6, valor, 10.5, True, align="L")
             y += alto + 1
 
         y += 1
-        objetivo_lineas = len(lineas(objetivo, 186, 10.5))
+        objetivo_lineas = len(lineas(objetivo, 180.6, 10.5))
         alto_objetivo = max(15, 5.1 * objetivo_lineas + 9)
         pdf.set_fill_color(247, 205, 66)
-        pdf.rect(10, y, 190, 6, style="F")
+        pdf.rect(12.7, y, 184.6, 6, style="F")
         pdf.set_font("Arial", "B", 10)
         set_color(VERDE)
-        pdf.set_xy(13, y + 0.5)
-        pdf.cell(184, 5, "OBJETIVO DE LA APLICACIÓN", align="C")
+        pdf.set_xy(15.7, y + 0.5)
+        pdf.cell(178.6, 5, "OBJETIVO DE LA APLICACIÓN", align="C")
         pdf.set_fill_color(255, 250, 231)
-        pdf.rect(10, y + 6, 190, alto_objetivo - 6, style="F")
-        texto_ajustado(13, y + 7, 184, objetivo, 10.5, align="C")
+        pdf.rect(12.7, y + 6, 184.6, alto_objetivo - 6, style="F")
+        texto_ajustado(15.7, y + 7, 178.6, objetivo, 10.5, align="C")
         y += alto_objetivo + 2
         return y + 2
 
     def cabecera_tabla(y):
         pdf.set_fill_color(*VERDE)
-        pdf.rect(10, y, ANCHO, 10, style="F")
-        x = 10
+        pdf.rect(12.7, y, ANCHO, 10, style="F")
+        x = 12.7
         for ancho, nombre in zip(COLS, ["Nombre Comercial", "Ingrediente Activo", "Familia - Grupo", "Dosis / 2000 L"]):
             pdf.set_font("Arial", "B", 9.2)
             set_color(BLANCO)
@@ -579,7 +580,7 @@ def generar_pdf_estilo_solano(
         # antes de dibujarla si hace falta. Nunca se corta una fila.
         if (y + altura > 263) or (ultimo and y + altura + 75 > 276):
             y = cabecera_tabla(encabezado(continuacion=True))
-        x = 10
+        x = 12.7
         for i, (ancho, valor) in enumerate(zip(COLS, valores)):
             pdf.set_fill_color(*(AMARILLO if i == 3 else ((255, 255, 255) if indice % 2 else (247, 250, 248))))
             pdf.rect(x, y, ancho, altura, style="F")
@@ -609,9 +610,9 @@ def generar_pdf_estilo_solano(
 
     pdf.set_draw_color(*VERDE_MEDIO)
     pdf.line(50, y + 10, 160, y + 10)
-    texto_ajustado(10, y + 13, 190, asesor_nombre, 10.5, True, align="C")
-    texto_ajustado(10, y + 19, 190, asesor_ced, 9.5, align="C")
-    texto_ajustado(10, y + 24, 190, asesor_rfc, 9.5, align="C")
+    texto_ajustado(12.7, y + 13, 184.6, asesor_nombre, 10.5, True, align="C")
+    texto_ajustado(12.7, y + 19, 184.6, asesor_ced, 9.5, align="C")
+    texto_ajustado(12.7, y + 24, 184.6, asesor_rfc, 9.5, align="C")
 
     datos_qr = generar_sello_y_qr(
         num_factura=num_factura, cliente_nombre=cliente_nombre,
@@ -621,18 +622,18 @@ def generar_pdf_estilo_solano(
     y_qr = y + 32
     pdf.set_draw_color(*VERDE_MEDIO)
     pdf.set_fill_color(248, 251, 248)
-    pdf.rect(10, y_qr, 190, 29, style="DF")
+    pdf.rect(12.7, y_qr, 184.6, 29, style="DF")
     datos_qr["qr_bytes"].seek(0)
-    pdf.image(datos_qr["qr_bytes"], x=13, y=y_qr + 2.5, w=24, h=24)
+    pdf.image(datos_qr["qr_bytes"], x=15.7, y=y_qr + 2.5, w=24, h=24)
     pdf.set_font("Arial", "B", 8.2)
     set_color(VERDE)
-    pdf.set_xy(42, y_qr + 3)
-    pdf.cell(155, 5, "VERIFICACIÓN Y AUTENTICIDAD DIGITAL - SOLANO AGROQUÍMICOS")
+    pdf.set_xy(44.7, y_qr + 3)
+    pdf.cell(150, 5, "VERIFICACIÓN Y AUTENTICIDAD DIGITAL - SOLANO AGROQUÍMICOS")
     usuario = getattr(st, "session_state", {}).get("usuario") or {}
     emisor = limpio(usuario.get("nombre", "Administrador Solano"))
-    texto_ajustado(42, y_qr + 9, 154, f"Emitido por: {emisor} | Fecha: {fecha_pdf}", 8)
-    texto_ajustado(42, y_qr + 15, 154, f"Código de autenticidad: {sello_texto}", 8, True)
-    texto_ajustado(42, y_qr + 21, 154, "Escanee el QR para consultar los datos de esta receta.", 7.5)
+    texto_ajustado(44.7, y_qr + 9, 149, f"Emitido por: {emisor} | Fecha: {fecha_pdf}", 8)
+    texto_ajustado(44.7, y_qr + 15, 149, f"Código de autenticidad: {sello_texto}", 8, True)
+    texto_ajustado(44.7, y_qr + 21, 149, "Escanee el QR para consultar los datos de esta receta.", 7.5)
     # Detalle importante: el QR actual contiene información, no un enlace de consulta.
     return pdf.output()
 

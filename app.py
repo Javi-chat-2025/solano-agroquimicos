@@ -582,54 +582,112 @@ def generar_pdf_estilo_solano(
 # ==========================================
 @st.dialog("✏️ Editar receta", width="large")
 def editar_receta(receta, cliente, huerta):
-    st.info(f"Estás editando la receta #{receta['id_receta']}. Al guardar se creará una versión nueva en esta misma huerta, conservando la original.")
+    id_original = receta["id_receta"]
+    clave = f"editor_receta_{id_original}"
+    st.info(f"Receta #{id_original}. Al guardar, se creará una nueva versión en esta huerta y se conservará la anterior.")
+
     try:
         catalogo = supabase.table("productos").select("id_producto,nombre_comercial,nombre_tecnico,uso").execute().data or []
     except Exception as e:
         st.error(f"No se pudo cargar el catálogo: {e}")
         return
     por_id = {str(p["id_producto"]): p for p in catalogo}
-    anteriores = {}
-    for detalle in receta.get("receta_detalles", []):
-        prod = detalle.get("productos") or {}
-        codigo = str(prod.get("id_producto", ""))
-        if codigo:
-            anteriores[codigo] = detalle
-    faltantes = set(anteriores) - set(por_id)
-    if faltantes:
-        st.error("La receta contiene productos que ya no están en el catálogo. No es seguro editarla hasta restaurarlos.")
-        return
-    with st.form(f"editar_receta_form_{receta['id_receta']}"):
-        try:
-            fecha_inicial = datetime.strptime(str(receta.get("fecha", "")), "%d/%m/%Y").date()
-        except ValueError:
-            fecha_inicial = obtener_datetime_local().date()
-        fecha = st.date_input("📅 Fecha de receta", value=fecha_inicial, format="DD/MM/YYYY")
-        volumen = st.text_input("🛢️ Volumen del tanque", value=str(receta.get("volumen_tanque") or ""))
-        objetivo = st.text_input("🎯 Objetivo de la aplicación", value=str(receta.get("objetivo") or ""))
-        st.markdown("#### 🧪 Productos y dosis")
-        opciones = list(por_id)
-        elegidos = st.multiselect(
-            "Selecciona los productos que debe incluir esta versión",
-            options=opciones,
-            default=list(anteriores),
-            format_func=lambda x: f"[{x}] {por_id[x]['nombre_comercial']}",
-        )
-        detalle_nuevo = []
-        unidades = ["ml", "lt", "gr", "kg", "ml / Ha", "lt / Ha", "gr / Ha", "kg / Ha", "ml / 2000 lt", "lt / 2000 lt", "gr / 2000 lt", "kg / 2000 lt"]
-        for i, codigo in enumerate(elegidos):
-            anterior = anteriores.get(codigo, {})
-            st.markdown(f"**{por_id[codigo]['nombre_comercial']}**")
-            dosis = st.text_input("💧 Dosis", value=str(anterior.get("dosis") or "1"), key=f"er_dosis_{receta['id_receta']}_{codigo}")
-            unidad_previa = str(anterior.get("unidad") or "ml").strip()
-            unidades_op = unidades if unidad_previa in unidades else [unidad_previa] + unidades
-            unidad = st.selectbox("📏 Unidad", unidades_op, index=unidades_op.index(unidad_previa), key=f"er_unidad_{receta['id_receta']}_{codigo}")
-            detalle_nuevo.append({"id_producto": por_id[codigo]["id_producto"], "dosis": dosis.strip(), "unidad": unidad})
-        confirmar = st.checkbox("Confirmo que revisé la información y deseo crear una versión corregida")
-        guardar = st.form_submit_button("💾 Guardar nueva versión", type="primary", use_container_width=True)
-    if guardar:
-        if not confirmar or not detalle_nuevo or not objetivo.strip() or not volumen.strip() or any(not d["dosis"] for d in detalle_nuevo):
-            st.error("Revisa los datos, selecciona al menos un producto y marca la confirmación.")
+    unidades = ["ml", "lt", "gr", "kg", "ml / Ha", "lt / Ha", "gr / Ha", "kg / Ha",
+                "ml / 2000 lt", "lt / 2000 lt", "gr / 2000 lt", "kg / 2000 lt"]
+
+    # Cargar los productos originales una sola vez por apertura de la receta.
+    if clave not in st.session_state:
+        detalles = []
+        for d in receta.get("receta_detalles", []):
+            producto = d.get("productos") or {}
+            detalles.append({"id_producto": producto.get("id_producto"),
+                             "dosis": str(d.get("dosis") or ""),
+                             "unidad": str(d.get("unidad") or "ml")})
+        st.session_state[clave] = {"productos": detalles, "editar": None, "agregar": False}
+
+    editor = st.session_state[clave]
+    try:
+        fecha_inicial = datetime.strptime(str(receta.get("fecha", "")), "%d/%m/%Y").date()
+    except ValueError:
+        fecha_inicial = obtener_datetime_local().date()
+    fecha = st.date_input("📅 Fecha de receta", value=fecha_inicial, format="DD/MM/YYYY", key=f"{clave}_fecha")
+    volumen = st.text_input("🛢️ Volumen del tanque", value=str(receta.get("volumen_tanque") or ""), key=f"{clave}_volumen")
+    objetivo = st.text_input("🎯 Objetivo de la aplicación", value=str(receta.get("objetivo") or ""), key=f"{clave}_objetivo")
+
+    st.markdown("### 🧪 Lista de productos de la receta")
+    if not editor["productos"]:
+        st.warning("La receta no tiene productos. Agrega al menos uno antes de guardar.")
+
+    for i, d in enumerate(editor["productos"]):
+        codigo = str(d["id_producto"])
+        producto = por_id.get(codigo)
+        nombre = producto["nombre_comercial"] if producto else f"Producto [{codigo}] (fuera del catálogo)"
+        with st.container(border=True):
+            st.markdown(f"**{i + 1}. [{codigo}] {nombre}**")
+            st.write(f"💧 **Cantidad / Dosis:** {d['dosis']} {d['unidad']}")
+            col_ed, col_del = st.columns(2)
+            with col_ed:
+                if st.button("✏️ Editar producto", key=f"{clave}_abrir_ed_{i}", use_container_width=True):
+                    editor["editar"] = i
+                    editor["agregar"] = False
+                    st.rerun()
+            with col_del:
+                if st.button("🗑️ Eliminar producto", key=f"{clave}_borrar_{i}", use_container_width=True):
+                    editor["productos"].pop(i)
+                    editor["editar"] = None
+                    st.rerun()
+
+            if editor["editar"] == i:
+                with st.form(f"{clave}_form_ed_{i}"):
+                    dosis_ed = st.text_input("💧 Nueva cantidad / dosis", value=d["dosis"])
+                    unidad_actual = d["unidad"]
+                    opciones_unidad = unidades if unidad_actual in unidades else [unidad_actual] + unidades
+                    unidad_ed = st.selectbox("📏 Unidad", opciones_unidad,
+                                             index=opciones_unidad.index(unidad_actual))
+                    guardar_ed = st.form_submit_button("✅ Aplicar cambio", type="primary")
+                if guardar_ed:
+                    if not dosis_ed.strip():
+                        st.error("La dosis no puede estar vacía.")
+                    else:
+                        d["dosis"] = dosis_ed.strip()
+                        d["unidad"] = unidad_ed
+                        editor["editar"] = None
+                        st.rerun()
+
+    if st.button("➕ Agregar producto", key=f"{clave}_abrir_agregar", use_container_width=True):
+        editor["agregar"] = True
+        editor["editar"] = None
+        st.rerun()
+
+    if editor["agregar"]:
+        opciones = [k for k in por_id if k not in {str(d["id_producto"]) for d in editor["productos"]}]
+        if not opciones:
+            st.info("No quedan productos disponibles en el catálogo para agregar.")
+        else:
+            with st.form(f"{clave}_form_agregar"):
+                codigo_nuevo = st.selectbox("🧪 Seleccionar producto", opciones,
+                                            format_func=lambda k: f"[{k}] {por_id[k]['nombre_comercial']}")
+                dosis_nueva = st.text_input("💧 Cantidad / dosis", value="1")
+                unidad_nueva = st.selectbox("📏 Unidad", unidades)
+                confirmar_agregar = st.form_submit_button("✅ Añadir a la lista", type="primary")
+            if confirmar_agregar:
+                if not dosis_nueva.strip():
+                    st.error("Escribe una dosis válida.")
+                else:
+                    editor["productos"].append({"id_producto": por_id[codigo_nuevo]["id_producto"],
+                                                 "dosis": dosis_nueva.strip(), "unidad": unidad_nueva})
+                    editor["agregar"] = False
+                    st.rerun()
+
+    st.divider()
+    confirmar = st.checkbox("Confirmo que revisé los productos y deseo crear una versión corregida", key=f"{clave}_confirmar")
+    if st.button("💾 Guardar nueva versión de receta", type="primary", use_container_width=True, key=f"{clave}_guardar"):
+        detalle_nuevo = editor["productos"]
+        if not confirmar or not detalle_nuevo or not objetivo.strip() or not volumen.strip() or any(not d["dosis"].strip() for d in detalle_nuevo):
+            st.error("Revisa los datos, incluye al menos un producto y marca la confirmación.")
+            return
+        if any(str(d["id_producto"]) not in por_id for d in detalle_nuevo):
+            st.error("Hay productos que ya no están disponibles en el catálogo. Elimínalos o restáuralos antes de guardar.")
             return
         id_creado = None
         try:
@@ -652,9 +710,10 @@ def editar_receta(receta, cliente, huerta):
                     supabase.table("receta_detalles").delete().eq("id_receta", id_creado).execute()
                     supabase.table("recetas").delete().eq("id_receta", id_creado).execute()
                 except Exception:
-                    st.warning("No se pudo revertir automáticamente el registro incompleto. Revísalo en Supabase.")
+                    st.warning("No se pudo revertir el registro incompleto. Revísalo en Supabase.")
             st.error(f"No se pudo guardar la nueva versión: {e}")
             return
+        st.session_state.pop(clave, None)
         st.session_state["receta_ultima_editada"] = id_creado
         st.rerun()
 

@@ -7,3 +7,4 @@ extra_streamlit_components
 qrcode
 python-dotenv
 pytz
+streamlit-sortables

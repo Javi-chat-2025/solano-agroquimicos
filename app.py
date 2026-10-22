@@ -575,10 +575,10 @@ def generar_pdf_estilo_solano(
         ]
         alturas = [len(lineas(valor, col, 9.5, idx in (0, 3))) for idx, (valor, col) in enumerate(zip(valores, COLS))]
         altura = max(10.5, max(alturas) * 5.1 + 3.5)
-        # Filas normales: hasta 265 mm. Para la ÚLTIMA fila reservamos
-        # espacio real para firma, QR y pie, moviéndola a la página siguiente
-        # antes de dibujarla si hace falta. Nunca se corta una fila.
-        if (y + altura > 263) or (ultimo and y + altura + 75 > 276):
+        # Cada producto se pagina por separado: NO reservar espacio
+        # para la firma ni para el QR durante el dibujo de la tabla.
+        # Así la penúltima hoja se aprovecha hasta el límite seguro.
+        if y + altura > 275:
             y = cabecera_tabla(encabezado(continuacion=True))
         x = 12.7
         for i, (ancho, valor) in enumerate(zip(COLS, valores)):
@@ -600,13 +600,13 @@ def generar_pdf_estilo_solano(
         for i, prod in enumerate(productos_detalle):
             y = fila(y, prod, i, ultimo=(i == len(productos_detalle) - 1))
 
-    # Espaciado dinámico: firma y QR siguen la tabla sin posición fija.
-    # El pie nunca invade la caja de autenticidad.
-    y = y + 10
-    if y + 60 > 276:
-        # En caso de datos generales extraordinariamente extensos,
-        # se abre página nueva sin sobreponer contenido.
-        y = encabezado(continuacion=True) + 10
+    # Firma y verificación se paginan INDEPENDIENTEMENTE.
+    # Puede quedar la firma en una hoja y el QR en la siguiente.
+    # No se crea una página nueva hasta que el elemento correspondiente
+    # deje de caber, reduciendo espacios en blanco innecesarios.
+    y += 5
+    if y + 30 > 276:
+        y = encabezado(continuacion=True) + 6
 
     pdf.set_draw_color(*VERDE_MEDIO)
     pdf.line(50, y + 10, 160, y + 10)
@@ -619,12 +619,16 @@ def generar_pdf_estilo_solano(
         huerta_nombre=huerta_nombre, fecha=fecha, productos_detalle=productos_detalle
     )
     sello_texto = sello_digital or datos_qr["sello"]
-    y_qr = y + 32
+    y_qr = y + 30
+    if y_qr + 26 > 276:
+        # QR y sus textos permanecen juntos, pero no obligan
+        # a mover la firma a esta página.
+        y_qr = encabezado(continuacion=True) + 6
     pdf.set_draw_color(*VERDE_MEDIO)
     pdf.set_fill_color(248, 251, 248)
-    pdf.rect(12.7, y_qr, 184.6, 29, style="DF")
+    pdf.rect(12.7, y_qr, 184.6, 26, style="DF")
     datos_qr["qr_bytes"].seek(0)
-    pdf.image(datos_qr["qr_bytes"], x=15.7, y=y_qr + 2.5, w=24, h=24)
+    pdf.image(datos_qr["qr_bytes"], x=16.7, y=y_qr + 2.5, w=21, h=21)
     pdf.set_font("Arial", "B", 8.2)
     set_color(VERDE)
     pdf.set_xy(44.7, y_qr + 3)

@@ -1,262 +1,140 @@
-/* ==========================================
-   CONFIGURACIÓN ANTI-DARK MODE (MÓVILES)
-   ========================================== */
-:root {
-    color-scheme: light !important;
-}
-
-@media (prefers-color-scheme: dark) {
-    html, body, [class*="css"], [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-        background-color: #f8fafc !important;
-        color: #0f172a !important;
-    }
-    
-    div[data-testid="stVerticalBlockBorderWrapper"],
-    div[data-testid="stExpander"],
-    .stTextInput input, 
-    .stNumberInput input, 
-    .stTextArea textarea,
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-    }
-}
-
-/* ==========================================
-   DESIGN TOKENS - SOLANO AGROQUÍMICOS
-   ========================================== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* SOLANO AGROQUÍMICOS — Tema moderno, solo presentación.
+   Conserva los widgets y la lógica de app.py sin modificaciones. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-    /* Paleta Principal (Verde Agrícola Premium) */
-    --brand-primary: #1b4332;
-    --brand-primary-hover: #2d6a4f;
-    --brand-accent: #40916c;
-    --brand-light: #d8f3dc;
-    
-    /* Colores Neutros (Slate) */
-    --bg-app: #f8fafc;
-    --bg-card: #ffffff;
-    --border-color: #e2e8f0;
-    --border-focus: #40916c;
-    --text-main: #0f172a;
-    --text-muted: #64748b;
-    
-    /* Sombras y Radios */
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 14px;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  color-scheme: light;
+  --solano-dark: #164b35;
+  --solano-main: #1b4332;
+  --solano-hover: #2d6a4f;
+  --solano-accent: #40916c;
+  --solano-soft: #e8f4ec;
+  --solano-bg: #f3f7f4;
+  --solano-white: #ffffff;
+  --solano-border: #dbe7df;
+  --solano-text: #162a23;
+  --solano-muted: #5d7067;
+  --solano-radius: 14px;
+  --solano-shadow: 0 3px 14px rgba(22,75,53,.055);
 }
-
-/* ==========================================
-   ESTILOS BASE
-   ========================================== */
-html, body, [class*="css"], [data-testid="stAppViewContainer"] {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-    color: var(--text-main) !important;
-    background-color: var(--bg-app) !important;
-    -webkit-font-smoothing: antialiased;
+html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  background: var(--solano-bg) !important;
+  color: var(--solano-text) !important;
 }
+[data-testid="stAppViewContainer"] > .main { background: transparent !important; }
+/* Mantener menú nativo oculto tal como en el CSS previo. */
+#MainMenu, footer, header, [data-testid="stHeader"] {visibility:hidden; height:0;}
+.block-container {max-width: 1080px !important; padding: 2rem 1.75rem 4rem !important;}
 
-/* Limpieza de la interfaz de Streamlit */
-#MainMenu, footer, header, [data-testid="stHeader"] { 
-    visibility: hidden; 
-    height: 0;
-}
+h1,h2,h3,h4,h5,h6 {color: var(--solano-main) !important;letter-spacing:-.025em;line-height:1.3;}
+h1 {font-size:clamp(1.65rem,3vw,2.1rem)!important;font-weight:800!important;}
+h2 {font-size:1.55rem!important;font-weight:750!important;}
+h3 {font-size:1.26rem!important;font-weight:700!important;}
+p, li, [data-testid="stMarkdownContainer"] {line-height:1.55;}
+[data-testid="stCaptionContainer"] {color:var(--solano-muted)!important;}
+hr {border:0!important;border-top:1px solid var(--solano-border)!important;margin:1.35rem 0!important;}
 
-/* Layout del contenedor principal */
-.block-container {
-    padding-top: 1.8rem !important;
-    padding-bottom: 3.5rem !important;
-    max-width: 94% !important;
-}
-
-/* ==========================================
-   TIPOGRAFÍA Y ENCABEZADOS
-   ========================================== */
-h1, h2, h3, h4, h5, h6 {
-    color: var(--text-main) !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.025em !important;
-}
-
-h1 { font-size: 1.85rem !important; }
-h2 { font-size: 1.5rem !important; }
-h3 { font-size: 1.25rem !important; }
-
-/* ==========================================
-   CAMPOS DE ENTRADA (Inputs, Selects, Textareas)
-   ========================================== */
-div[data-baseweb="input"] > div,
-div[data-baseweb="select"] > div,
-.stTextInput input, 
-.stNumberInput input, 
-.stTextArea textarea {
-    border-radius: var(--radius-sm) !important;
-    border: 1px solid var(--border-color) !important;
-    background-color: var(--bg-card) !important;
-    color: var(--text-main) !important;
-    font-size: 14px !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-/* Focus Moderno con Ring Verde Soft */
-.stTextInput input:focus, 
-.stNumberInput input:focus, 
-.stTextArea textarea:focus,
-div[data-baseweb="select"]:focus-within {
-    border-color: var(--border-focus) !important;
-    box-shadow: 0 0 0 3px rgba(64, 145, 108, 0.2) !important;
-    outline: none !important;
-}
-
-/* Labels de los campos */
-.stTextInput label, .stSelectbox label, .stNumberInput label, .stTextArea label, .stDateInput label {
-    font-weight: 600 !important;
-    font-size: 13px !important;
-    color: #334155 !important;
-    margin-bottom: 4px !important;
-}
-
-/* ==========================================
-   BOTONES PROFESIONALES Y ACCIONES
-   ========================================== */
-/* Estilo Base para Todos los Botones */
-div.stButton > button {
-    border-radius: var(--radius-sm) !important;
-    font-weight: 600 !important;
-    font-size: 14px !important;
-    padding: 0.45rem 0.9rem !important;
-    border: 1px solid var(--border-color) !important;
-    background-color: var(--bg-card) !important;
-    color: var(--text-main) !important;
-    box-shadow: var(--shadow-sm) !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: 40px !important;
-}
-
-div.stButton > button:hover {
-    background-color: #f1f5f9 !important;
-    border-color: #cbd5e1 !important;
-    color: var(--text-main) !important;
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md) !important;
-}
-
-div.stButton > button:active {
-    transform: translateY(0);
-    box-shadow: var(--shadow-sm) !important;
-}
-
-/* Botón Primario (Verde Agrotech) */
-div.stButton > button[kind="primary"] {
-    background-color: var(--brand-primary) !important;
-    color: #ffffff !important;
-    border: 1px solid var(--brand-primary) !important;
-    box-shadow: 0 2px 4px rgba(27, 67, 50, 0.2) !important;
-}
-
-div.stButton > button[kind="primary"]:hover {
-    background-color: var(--brand-primary-hover) !important;
-    border-color: var(--brand-primary-hover) !important;
-    color: #ffffff !important;
-    box-shadow: 0 4px 8px rgba(27, 67, 50, 0.3) !important;
-}
-
-/* Botón de Descarga */
-div.stDownloadButton > button {
-    border-radius: var(--radius-sm) !important;
-    font-weight: 600 !important;
-    background-color: #0284c7 !important;
-    color: #ffffff !important;
-    border: none !important;
-    transition: all 0.2s ease !important;
-}
-
-div.stDownloadButton > button:hover {
-    background-color: #0369a1 !important;
-    color: #ffffff !important;
-    box-shadow: 0 4px 8px rgba(2, 132, 199, 0.25) !important;
-}
-
-/* ==========================================
-   TARJETAS Y CONTENEDORES (st.container)
-   ========================================== */
+/* Tarjetas Streamlit */
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: var(--radius-md) !important;
-    padding: 1rem !important;
-    box-shadow: var(--shadow-sm) !important;
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  background: var(--solano-white)!important;
+  border:1px solid var(--solano-border)!important;
+  border-radius:var(--solano-radius)!important;
+  box-shadow:var(--solano-shadow)!important;
+  padding:1rem!important;
+  transition:border-color .2s ease, box-shadow .2s ease;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:hover {border-color:#c6ddcf!important;box-shadow:0 5px 20px rgba(22,75,53,.075)!important;}
+
+/* Etiquetas / inputs */
+.stTextInput label, .stSelectbox label, .stNumberInput label, .stTextArea label,
+.stDateInput label, .stTimeInput label, .stFileUploader label {font-size: .91rem!important;font-weight:650!important;color:#304d3f!important;}
+.stTextInput input, .stNumberInput input, .stTextArea textarea,
+div[data-baseweb="input"] > div, div[data-baseweb="select"] > div,
+div[data-baseweb="textarea"] > div {
+  background:var(--solano-white)!important;
+  color:var(--solano-text)!important;
+  border:1px solid var(--solano-border)!important;
+  border-radius:10px!important;
+  font-size:15px!important;
+  min-height:44px;
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus,
+div[data-baseweb="select"]:focus-within, div[data-baseweb="input"]:focus-within {
+  border-color:var(--solano-accent)!important;
+  box-shadow:0 0 0 3px rgba(64,145,108,.15)!important;
+  outline:none!important;
 }
 
-div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-    box-shadow: var(--shadow-md) !important;
-    border-color: #cbd5e1 !important;
+/* Botones: solo su aspecto, sin alterar acciones ni eventos */
+div.stButton > button, div.stFormSubmitButton > button {
+  min-height:44px!important;
+  padding:.55rem 1rem!important;
+  border:1px solid var(--solano-border)!important;
+  border-radius:10px!important;
+  background:white!important;
+  color:var(--solano-main)!important;
+  font-weight:650!important;
+  font-size:.91rem!important;
+  box-shadow:0 1px 3px rgba(22,75,53,.05)!important;
+  transition: background .2s, box-shadow .2s, transform .2s;
 }
-
-/* ==========================================
-   PESTAÑAS (st.tabs)
-   ========================================== */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 6px;
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 0px;
+div.stButton > button:hover, div.stFormSubmitButton > button:hover {
+  background:var(--solano-soft)!important;
+  border-color:#b5d2c0!important;
+  box-shadow:0 4px 10px rgba(22,75,53,.11)!important;
+  transform:translateY(-1px);
 }
+div.stButton > button[kind="primary"], div.stFormSubmitButton > button[kind="primary"] {
+  background:var(--solano-main)!important;
+  border-color:var(--solano-main)!important;
+  color:#fff!important;
+}
+div.stButton > button[kind="primary"]:hover, div.stFormSubmitButton > button[kind="primary"]:hover {
+  background:var(--solano-hover)!important;border-color:var(--solano-hover)!important;color:white!important;
+}
+div.stDownloadButton > button {
+  background:#0e7490!important;color:#fff!important;
+  border:1px solid #0e7490!important;border-radius:10px!important;
+  min-height:44px!important;font-weight:650!important;
+}
+div.stDownloadButton > button:hover {background:#155e75!important;color:#fff!important;border-color:#155e75!important;}
+button:focus-visible {outline:3px solid rgba(64,145,108,.35)!important;outline-offset:2px;}
 
+/* Navegación por pestañas */
+.stTabs [data-baseweb="tab-list"] {gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--solano-border);padding-bottom:10px;}
 .stTabs [data-baseweb="tab"] {
-    height: 44px;
-    border-radius: var(--radius-sm) var(--radius-sm) 0px 0px;
-    padding: 8px 18px;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--text-muted);
-    background-color: transparent;
-    transition: all 0.2s ease;
+  min-height:46px; height:auto; padding:10px 14px;
+  border-radius:9px!important;
+  background:#fff!important;
+  border:1px solid var(--solano-border)!important;
+  color:#475f53!important;
+  font-size:.89rem!important;font-weight:650!important;
+  transition:background .2s ease,color .2s ease;
 }
+.stTabs [data-baseweb="tab"]:hover {background:var(--solano-soft)!important;color:var(--solano-main)!important;}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {background:var(--solano-main)!important;color:white!important;border-color:var(--solano-main)!important;}
+.stTabs [data-baseweb="tab-highlight"] {display:none;}
+.stTabs [data-baseweb="tab-border"] {background:transparent;}
 
-.stTabs [data-baseweb="tab"]:hover {
-    color: var(--brand-primary);
-    background-color: rgba(216, 243, 220, 0.3);
+/* Expanders, alertas, tablas y popovers */
+div[data-testid="stExpander"] {background:white!important;border:1px solid var(--solano-border)!important;border-radius:12px!important;box-shadow:var(--solano-shadow)!important;overflow:hidden;}
+div[data-testid="stExpander"] summary {font-weight:650!important;color:var(--solano-main)!important;}
+.stAlert {border-radius:10px!important;box-shadow:0 1px 6px rgba(22,75,53,.05)!important;}
+[data-testid="stDataFrame"], [data-testid="stTable"] {border-radius:10px;overflow:hidden;}
+
+@media(prefers-color-scheme:dark) {
+  html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"] {background:var(--solano-bg)!important;color:var(--solano-text)!important;}
+  div[data-testid="stVerticalBlockBorderWrapper"], div[data-testid="stExpander"] {background:#fff!important;color:var(--solano-text)!important;}
 }
-
-.stTabs [aria-selected="true"] {
-    background-color: var(--brand-primary) !important;
-    color: #ffffff !important;
+@media(max-width:768px) {
+  .block-container {max-width:100%!important;padding:1rem .85rem 3rem!important;}
+  .stTabs [data-baseweb="tab-list"] {flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;}
+  .stTabs [data-baseweb="tab"] {flex:0 0 auto;white-space:nowrap;font-size:.84rem!important;padding:9px 11px;}
+  div[data-testid="stVerticalBlockBorderWrapper"] {padding:.7rem!important;}
+  h1 {font-size:1.65rem!important;}
 }
-
-/* ==========================================
-   EXPANDERS Y NOTIFICACIONES
-   ========================================== */
-div[data-testid="stExpander"] {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: var(--radius-md) !important;
-    box-shadow: var(--shadow-sm) !important;
-    overflow: hidden;
-}
-
-div[data-testid="stExpander"] summary {
-    font-weight: 600 !important;
-    color: var(--text-main) !important;
-}
-
-.stAlert {
-    border-radius: var(--radius-sm) !important;
-    border: none !important;
-    box-shadow: var(--shadow-sm) !important;
-}
-
-/* Divisores Limpios */
-hr {
-    margin: 1.25rem 0 !important;
-    border: none !important;
-    border-top: 1px solid var(--border-color) !important;
+@media(prefers-reduced-motion:reduce) {
+  *, *::before, *::after {transition:none!important;animation:none!important;}
 }

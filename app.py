@@ -2,6 +2,7 @@ import os
 import io
 import json
 import hashlib
+import re
 from datetime import datetime, timedelta
 import pytz
 import streamlit as st
@@ -1539,6 +1540,55 @@ with tab_productos:
 
     st.write("---")
 
+    # IDs disponibles: la sugerencia se basa en el catálogo completo, no en el orden alfabético.
+    # El ID permanece editable porque algunas instalaciones usan códigos personalizados.
+    def obtener_referencia_ids_productos():
+        ids = []
+        tamano_lote = 1000
+        try:
+            for inicio in range(0, 50000, tamano_lote):
+                datos = (supabase.table("productos")
+                         .select("id_producto")
+                         .order("id_producto")
+                         .range(inicio, inicio + tamano_lote - 1)
+                         .execute().data or [])
+                ids.extend(str(fila["id_producto"]).strip() for fila in datos if fila.get("id_producto") is not None)
+                if len(datos) < tamano_lote:
+                    break
+            else:
+                return None, None, "El catálogo es muy grande para sugerir un ID con seguridad."
+        except Exception:
+            return None, None, "No fue posible consultar los IDs registrados."
+
+        if not ids:
+            return "Ninguno", "PROD-001", None
+
+        grupos = {}
+        for identificador in ids:
+            coincidencia = re.fullmatch(r"(.*?)(\d+)", identificador)
+            if coincidencia:
+                prefijo, numero = coincidencia.groups()
+                grupos.setdefault(prefijo, []).append((int(numero), len(numero), identificador))
+
+        if not grupos:
+            return "Sin secuencia numérica", None, "Los IDs no siguen una numeración identificable. Ingresa un ID manualmente."
+
+        # No elegir arbitrariamente un formato si el catálogo mezcla distintas familias de ID.
+        if len(grupos) > 1:
+            return "Varios formatos", None, "Se encontraron varios formatos de ID. Ingresa un ID manualmente para evitar confusiones."
+
+        prefijo, elementos = next(iter(grupos.items()))
+        numero_max, ancho, ultimo = max(elementos, key=lambda e: e[0])
+        ocupados = set(ids)
+        siguiente_num = numero_max + 1
+        siguiente = f"{prefijo}{siguiente_num:0{ancho}d}"
+        while siguiente in ocupados:
+            siguiente_num += 1
+            siguiente = f"{prefijo}{siguiente_num:0{ancho}d}"
+        return ultimo, siguiente, None
+
+    ultimo_id_producto, siguiente_id_producto, aviso_ids = obtener_referencia_ids_productos()
+
     col_f_prod, col_t_prod = st.container(), st.container()
     
     with col_f_prod:
@@ -1580,8 +1630,17 @@ with tab_productos:
                     st.rerun()
         else:
             st.markdown("### ➕ Registrar Nuevo Producto (Manual)")
+            if aviso_ids:
+                st.warning(aviso_ids)
+            else:
+                st.info(f"🆔 Último ID de la secuencia: **{ultimo_id_producto}**  |  ✅ Siguiente sugerido: **{siguiente_id_producto}**")
+            st.caption("El ID sugerido sigue la numeración existente. Puedes cambiarlo si necesitas otro código.")
+            if st.session_state.pop("solano_producto_registrado", False):
+                st.session_state.pop("solano_nuevo_id_producto", None)
+            if "solano_nuevo_id_producto" not in st.session_state:
+                st.session_state.solano_nuevo_id_producto = siguiente_id_producto or ""
             with st.form("form_nuevo_producto"):
-                id_prod_val = st.text_input("ID / Código Producto *", placeholder="Ej. PROD-001")
+                id_prod_val = st.text_input("🆔 ID / Código Producto *", key="solano_nuevo_id_producto", placeholder="Ej. PROD-001").strip()
                 nombre_com = st.text_input("🏷️ Nombre comercial *", placeholder="Ej. Amistar Extra")
                 nombre_tec = st.text_input("🧪 Ingrediente activo (con concentración)", placeholder="Ej. Azoxistrobin + Ciproconazol (200 g/L)")
                 uso_val = st.text_input("🧬 Familia - Grupo", placeholder="Ej. Estrobilurinas + Triazoles")
@@ -1589,14 +1648,22 @@ with tab_productos:
                 guardar_prod = st.form_submit_button("💾 Registrar Producto", type="primary")
                 
                 if guardar_prod:
-                    if id_prod_val and nombre_com:
+                    if id_prod_val and nombre_com.strip():
                         try:
+                            id_ocupado = (supabase.table("productos")
+                                          .select("id_producto")
+                                          .eq("id_producto", id_prod_val)
+                                          .limit(1).execute().data)
+                            if id_ocupado:
+                                st.error(f"El ID {id_prod_val} ya existe. Utiliza otro.")
+                                st.stop()
                             supabase.table("productos").insert({
                                 "id_producto": id_prod_val,
                                 "nombre_comercial": nombre_com,
                                 "nombre_tecnico": nombre_tec,
                                 "uso": uso_val
                             }).execute()
+                            st.session_state.solano_producto_registrado = True
                             st.success(f"Producto '[{id_prod_val}] {nombre_com}' registrado.")
                             st.rerun()
                         except Exception as e:
